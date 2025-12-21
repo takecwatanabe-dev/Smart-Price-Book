@@ -3,50 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes"> <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>Smart Price Eco</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>Smart Price Voice</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        /* Dark Mode Styling for Battery Saving */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #121212; color: #e0e0e0; touch-action: manipulation; }
         .app-container { max-width: 600px; margin: 0 auto; background: #121212; min-height: 100vh; padding-bottom: 80px; }
         
         .header { background: #000000; padding: 15px; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; }
         .status-bar { font-size: 0.8rem; background: #1e1e1e; color: #aaa; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         
-        /* Scanner Area */
         .scanner-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 2000; display: none; flex-direction: column; justify-content: center; }
         #reader { width: 100%; max-height: 70vh; }
         .scanner-controls { padding: 20px; text-align: center; background: #000; }
 
-        /* Card Styles */
         .card { background-color: #1e1e1e; border: 1px solid #333; color: #e0e0e0; }
         .form-control { background-color: #2c2c2c; border: 1px solid #444; color: #fff; }
         .form-control:focus { background-color: #333; color: #fff; border-color: #0d6efd; }
         
         .price-card { border-left: 5px solid #555; margin-bottom: 10px; }
-        .price-card.cheap { border-left-color: #ff5252; background-color: #2a1a1a; } /* 底値:赤 */
+        .price-card.cheap { border-left-color: #ff5252; background-color: #2a1a1a; }
         .price-card.normal { border-left-color: #4caf50; } 
 
         .btn-xl { padding: 20px; font-size: 1.3rem; width: 100%; border-radius: 15px; margin-bottom: 15px; font-weight: bold; }
         
-        /* Bottom Nav */
         .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e1e; border-top: 1px solid #333; padding: 10px; display: flex; justify-content: space-around; max-width: 600px; margin: 0 auto; z-index: 1000; }
         .nav-item { text-align: center; color: #666; font-size: 0.75rem; cursor: pointer; }
         .nav-item.active { color: #4dabf7; }
         .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
 
-        /* Veggie Grid */
         .veggie-btn { border: 1px solid #333; border-radius: 8px; padding: 15px; text-align: center; background: #2c2c2c; color: #fff; cursor: pointer; }
         .veggie-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        
+        /* Loading Spinner */
+        .spinner-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index: 3000; display:none; justify-content:center; align-items:center; flex-direction:column; color:white;}
     </style>
 </head>
 <body>
 
+<div id="loadingSpinner" class="spinner-overlay">
+    <div class="spinner-border text-primary" role="status"></div>
+    <div class="mt-2">商品情報を検索中...</div>
+</div>
+
 <div class="app-container">
     <div class="header d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart3"></i> SmartPrice</h5>
+        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart3"></i> SmartPrice <span class="badge bg-danger" style="font-size:0.5rem">v3.0</span></h5>
         <button class="btn btn-sm btn-outline-secondary" onclick="exportData()"><i class="bi bi-box-arrow-up"></i></button>
     </div>
     
@@ -64,7 +68,6 @@
         <button class="btn btn-outline-light btn-xl" onclick="showVeggieMenu()">
             <i class="bi bi-basket"></i> 野菜・肉など
         </button>
-
         <h6 class="mt-4 mb-3 text-secondary border-bottom border-secondary pb-2">最近の履歴</h6>
         <div id="historyList"></div>
     </div>
@@ -87,10 +90,13 @@
                 <input type="hidden" id="inputBarcode">
                 
                 <div class="mb-3">
+                    <label class="small text-secondary">商品名</label>
                     <div class="input-group">
-                        <input type="text" id="inputName" class="form-control form-control-lg fw-bold" placeholder="商品名">
+                        <input type="text" id="inputName" class="form-control form-control-lg fw-bold" placeholder="例: ポテチ">
+                        <button class="btn btn-outline-success" onclick="startVoiceInput()"><i class="bi bi-mic-fill"></i></button>
                         <button class="btn btn-outline-warning" onclick="toggleFavorite()"><i id="favIcon" class="bi bi-star"></i></button>
                     </div>
+                    <div class="form-text text-secondary" style="font-size:0.7rem;">※マイクボタンで音声入力できます</div>
                 </div>
 
                 <div class="row g-2 mb-3">
@@ -99,8 +105,8 @@
                         <input type="number" id="inputPrice" class="form-control form-control-lg fw-bold text-end text-warning" style="font-size:2rem;" placeholder="0" inputmode="numeric">
                     </div>
                     <div class="col-5">
-                        <label class="small text-secondary">内容量/メモ</label>
-                        <input type="text" id="inputNote" class="form-control" placeholder="g/個">
+                        <label class="small text-secondary">メモ</label>
+                        <input type="text" id="inputNote" class="form-control" placeholder="特価など">
                     </div>
                 </div>
 
@@ -149,14 +155,12 @@
 
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
-    // --- App State ---
     const DB_KEY = 'smart_price_db_v2';
     let appData = { products: {}, stores: [] };
     let currentStore = "未設定";
     let scanner = null;
     let isFavFilter = false;
 
-    // --- Init ---
     window.onload = () => {
         if(localStorage.getItem(DB_KEY)) appData = JSON.parse(localStorage.getItem(DB_KEY));
         renderHistory();
@@ -168,7 +172,6 @@
         renderHistory();
     }
 
-    // --- Views ---
     function showHome() {
         isFavFilter = false;
         document.getElementById('mainView').style.display = 'block';
@@ -193,20 +196,14 @@
         navs[1].classList.toggle('active', isFavFilter);
     }
 
-    // --- Scanner (Battery Saver Mode) ---
     function startScanner() {
         document.getElementById('scannerOverlay').style.display = 'flex';
-        
         if(!scanner) scanner = new Html5Qrcode("reader");
-        
         const config = { fps: 10, qrbox: { width: 250, height: 150 }, aspectRatio: 1.0 };
-        
         scanner.start({ facingMode: "environment" }, config, (decodedText) => {
-            // Success
-            stopScanner(); // Immediately stop camera to save battery
-            openForm(decodedText);
-        })
-        .catch(err => {
+            stopScanner();
+            handleScannedCode(decodedText);
+        }).catch(err => {
             alert("カメラ起動エラー: " + err);
             stopScanner();
         });
@@ -214,15 +211,78 @@
 
     function stopScanner() {
         if(scanner && scanner.isScanning) {
-            scanner.stop().then(() => {
-                document.getElementById('scannerOverlay').style.display = 'none';
-            });
+            scanner.stop().then(() => document.getElementById('scannerOverlay').style.display = 'none');
         } else {
             document.getElementById('scannerOverlay').style.display = 'none';
         }
     }
 
-    // --- Veggies ---
+    // --- Enhanced Product Fetching ---
+    async function handleScannedCode(code) {
+        // Check local DB first
+        if (appData.products[code]) {
+            openForm(code, appData.products[code].name);
+            return;
+        }
+
+        // Try OpenFoodFacts API
+        document.getElementById('loadingSpinner').style.display = 'flex';
+        let foundName = "";
+        
+        try {
+            const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+            const data = await res.json();
+            if(data.status === 1 && data.product && data.product.product_name) {
+                foundName = data.product.product_name;
+                // 日本語名があるか確認
+                if(data.product.product_name_ja) foundName = data.product.product_name_ja;
+            }
+        } catch(e) {
+            console.log("API Fetch Error");
+        }
+
+        document.getElementById('loadingSpinner').style.display = 'none';
+        openForm(code, foundName);
+    }
+
+    // --- Voice Input ---
+    function startVoiceInput() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("このブラウザは音声入力に対応していません。");
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'ja-JP';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        const btn = document.querySelector('.bi-mic-fill').parentElement;
+        btn.classList.remove('btn-outline-success');
+        btn.classList.add('btn-danger'); // visual cue
+
+        recognition.start();
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('inputName').value = transcript;
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-outline-success');
+        };
+
+        recognition.onerror = (event) => {
+            alert("音声認識エラー: " + event.error);
+            btn.classList.remove('btn-danger');
+            btn.classList.add('btn-outline-success');
+        };
+        
+        recognition.onend = () => {
+             btn.classList.remove('btn-danger');
+             btn.classList.add('btn-outline-success');
+        };
+    }
+
     function showVeggieMenu() {
         document.getElementById('mainView').style.display = 'none';
         document.getElementById('veggieView').style.display = 'block';
@@ -235,16 +295,11 @@
             const d = document.createElement('div');
             d.className = 'veggie-btn';
             d.innerText = v;
-            d.onclick = () => {
-                // Generate a pseudo-barcode for veggies
-                const pseudoCode = "MANUAL_" + v;
-                openForm(pseudoCode, v);
-            };
+            d.onclick = () => openForm("MANUAL_" + v, v);
             grid.appendChild(d);
         });
     }
 
-    // --- Form Logic ---
     function openForm(code, defaultName = "") {
         document.getElementById('mainView').style.display = 'none';
         document.getElementById('veggieView').style.display = 'none';
@@ -252,15 +307,17 @@
 
         const prod = appData.products[code];
         document.getElementById('inputBarcode').value = code;
-        document.getElementById('inputName').value = prod ? prod.name : defaultName;
+        
+        // Use existing name if available, otherwise default/fetched
+        const currentName = prod ? prod.name : defaultName;
+        document.getElementById('inputName').value = currentName;
+        
         document.getElementById('inputPrice').value = "";
         document.getElementById('inputNote').value = "";
         
-        // Favorite Icon
         const isFav = prod ? prod.favorite : false;
         document.getElementById('favIcon').className = isFav ? "bi bi-star-fill" : "bi bi-star";
 
-        // Stats
         const box = document.getElementById('statsBox');
         if(prod && prod.history.length > 0) {
             box.classList.remove('d-none');
@@ -278,9 +335,7 @@
         }
     }
 
-    function closeForm() {
-        showHome();
-    }
+    function closeForm() { showHome(); }
 
     function toggleFavorite() {
         const code = document.getElementById('inputBarcode').value;
@@ -288,7 +343,6 @@
             appData.products[code] = { name: document.getElementById('inputName').value, history: [], favorite: false };
         }
         appData.products[code].favorite = !appData.products[code].favorite;
-        
         const isFav = appData.products[code].favorite;
         document.getElementById('favIcon').className = isFav ? "bi bi-star-fill" : "bi bi-star";
     }
@@ -298,12 +352,10 @@
         const name = document.getElementById('inputName').value;
         const price = document.getElementById('inputPrice').value;
         const note = document.getElementById('inputNote').value;
-
         if(!price) { alert("価格を入れてください"); return; }
         
         if(!appData.products[code]) appData.products[code] = { name: name, history: [], favorite: false };
-        
-        appData.products[code].name = name; // update name
+        appData.products[code].name = name;
         
         const now = new Date();
         appData.products[code].history.push({
@@ -313,29 +365,22 @@
             store: currentStore,
             note: note
         });
-        
         saveDB();
         closeForm();
     }
 
-    // --- Location ---
     function getLocation() {
         if(!navigator.geolocation) return alert("GPS非対応");
         document.getElementById('storeName').innerHTML = '<i class="spinner-border spinner-border-sm"></i> 取得中...';
-        
         navigator.geolocation.getCurrentPosition(pos => {
             const lat = pos.coords.latitude;
             const lon = pos.coords.longitude;
-            
-            // Find nearest
             let nearest = null;
-            let minDist = 0.5; // 500m
-            
+            let minDist = 0.5;
             appData.stores.forEach(s => {
                 const d = getDist(lat, lon, s.lat, s.lon);
                 if(d < minDist) { minDist = d; nearest = s; }
             });
-
             if(nearest) {
                 currentStore = nearest.name;
             } else {
@@ -349,7 +394,7 @@
                 }
             }
             document.getElementById('storeName').innerHTML = `<i class="bi bi-geo-alt-fill text-danger"></i> ${currentStore}`;
-        }, err => {
+        }, () => {
             alert("位置情報エラー");
             document.getElementById('storeName').innerHTML = '<i class="bi bi-geo-alt"></i> エラー';
         });
@@ -363,7 +408,6 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    // --- Search ---
     function searchWeb(site) {
         const q = document.getElementById('inputName').value;
         if(!q) return;
@@ -374,11 +418,9 @@
         window.open(u, '_blank');
     }
     
-    // --- Render List ---
     function renderHistory() {
         const list = document.getElementById('historyList');
         list.innerHTML = "";
-        
         let items = [];
         Object.keys(appData.products).forEach(k => {
             const p = appData.products[k];
@@ -388,25 +430,13 @@
                 const prices = p.history.map(h=>h.price);
                 const min = Math.min(...prices);
                 items.push({
-                    code: k,
-                    name: p.name,
-                    price: last.price,
-                    date: last.date,
-                    store: last.store,
-                    isCheap: (last.price <= min && p.history.length > 1),
-                    fav: p.favorite,
-                    ts: last.timestamp
+                    code: k, name: p.name, price: last.price, date: last.date, store: last.store,
+                    isCheap: (last.price <= min && p.history.length > 1), fav: p.favorite, ts: last.timestamp
                 });
             }
         });
-        
         items.sort((a,b) => b.ts - a.ts);
-        
-        if(items.length===0) {
-            list.innerHTML = `<div class="text-center text-secondary mt-5">履歴がありません</div>`;
-            return;
-        }
-
+        if(items.length===0) { list.innerHTML = `<div class="text-center text-secondary mt-5">履歴がありません</div>`; return; }
         items.forEach(it => {
             const d = document.createElement('div');
             d.className = `card p-2 price-card ${it.isCheap ? 'cheap' : 'normal'}`;
@@ -422,20 +452,16 @@
                         <div class="fs-4 fw-bold text-white">${it.price}<span class="fs-6">円</span></div>
                         ${it.isCheap ? '<span class="badge bg-danger">底値!</span>' : ''}
                     </div>
-                </div>
-            `;
+                </div>`;
             list.appendChild(d);
         });
     }
 
     function exportData() {
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href",     dataStr);
-        downloadAnchorNode.setAttribute("download", "smart_price_backup.json");
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        const a = document.createElement('a');
+        a.href = dataStr; a.download = "smart_price_backup.json";
+        document.body.appendChild(a); a.click(); a.remove();
     }
 </script>
 </body>
