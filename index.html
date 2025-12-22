@@ -3,94 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Smart Price">
-    <title>Smart Price v4.1</title>
-    
-    <link rel="apple-touch-icon" href="data:image/png;base64,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">
-    <link rel="icon" type="image/png" href="data:image/png;base64,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">
+    <title>Smart Price v5.0</title>
+
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojMDA3YmZmO2JvcmRlci1yYWRpdXM6MjAlIj48cGF0aCBkPSJNMzk4LjEgMjM4LjVjLTcuOSA1NC42LTU0LjYgOTYuOC0xMTEgOTYuOGgtMTY1TDk3LjMgNTFIMzJWMjFoNzYuMmwyNC40IDE2NS41aDI1OS41YzEzLjIgMCAyNC43IDkuMyAyNi45IDIyLjNsMTguOCA5OS43eiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIxNjkuNSIgY3k9IjQxOSIgcj0iMzUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMzU4LjUiIGN5PSI0MTkiIHI9IjM1IiBmaWxsPSJ3aGl0ZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNDUlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjE4MCIgZmlsbD0iI2ZmYzEwNyIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIj7CoTwvdGV4dD48L3N2Zz4=">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojMDA3YmZmIj48cGF0aCBkPSJNMzk4LjEgMjM4LjVjLTcuOSA1NC42LTU0LjYgOTYuOC0xMTEgOTYuOGgtMTY1TDk3LjMgNTFIMzJWMjFoNzYuMmwyNC40IDE2NS41aDI1OS41YzEzLjIgMCAyNC43IDkuMyAyNi45IDIyLjNsMTguOCA5OS43eiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIxNjkuNSIgY3k9IjQxOSIgcj0iMzUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMzU4LjUiIGN5PSI0MTkiIHI9IjM1IiBmaWxsPSJ3aGl0ZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNDUlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LXNpemU9IjE4MCIgZmlsbD0iI2ZmYzEwNyIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSJib2xkIj7CoTwvdGV4dD48L3N2Zz4=">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #121212; color: #e0e0e0; touch-action: manipulation; padding-bottom: 80px; }
-        .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; position: relative; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
+        .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; }
         
-        /* Header & Bar */
-        .header { background: rgba(0,0,0,0.9); padding: 15px; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; backdrop-filter: blur(10px); }
-        .status-bar { font-size: 0.8rem; background: #1e1e1e; color: #aaa; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .header { background: #000; padding: 12px 15px; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; }
+        .status-bar { font-size: 0.8rem; background: #1e1e1e; color: #aaa; padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
         
-        /* Cards & UI */
-        .card { background-color: #1e1e1e; border: 1px solid #333; color: #e0e0e0; margin-bottom: 10px; }
-        .form-control { background-color: #2c2c2c; border: 1px solid #444; color: #fff; }
-        .form-control:focus { background-color: #333; color: #fff; border-color: #0d6efd; }
+        /* Cards */
+        .card { background-color: #1e1e1e; border: 1px solid #333; color: #e0e0e0; margin-bottom: 8px; }
+        .form-control { background-color: #2c2c2c; border: 1px solid #444; color: #fff; font-size: 1.1rem; }
+        .form-control:focus { background-color: #333; color: #fff; border-color: #0d6efd; box-shadow: none; }
         
-        .price-card { border-left: 5px solid #555; position: relative; overflow: hidden; }
+        /* Price Cards */
+        .price-card { border-left: 5px solid #555; position: relative; overflow: hidden; padding: 10px; }
         .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
-        .price-card.normal { border-left-color: #4caf50; } 
+        .prod-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; background: #333; margin-right: 12px; }
         
-        .prod-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; background: #333; }
-        
-        .btn-xl { padding: 18px; font-size: 1.2rem; width: 100%; border-radius: 12px; margin-bottom: 12px; font-weight: bold; }
-        
-        /* Bottom Nav & Launcher */
-        .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(30,30,30,0.95); border-top: 1px solid #333; padding: 10px 0; display: flex; justify-content: space-around; max-width: 600px; margin: 0 auto; z-index: 1000; backdrop-filter: blur(5px); }
-        .nav-item { text-align: center; color: #666; font-size: 0.7rem; cursor: pointer; flex: 1; }
-        .nav-item.active { color: #4dabf7; }
-        .nav-item i { font-size: 1.3rem; display: block; margin-bottom: 2px; }
+        /* Big Buttons */
+        .btn-menu { height: 120px; border-radius: 15px; font-weight: bold; font-size: 1.2rem; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; }
+        .btn-scan { background: linear-gradient(135deg, #007bff, #0056b3); border: none; }
+        .btn-manual { background: linear-gradient(135deg, #6c757d, #495057); border: none; }
+
+        /* Bottom Nav */
+        .nav-bottom { position: fixed; bottom: 0; left: 0; right: 0; background: #000; border-top: 1px solid #333; padding: 10px 0; display: flex; justify-content: space-around; max-width: 600px; margin: 0 auto; z-index: 1000; }
+        .nav-item { text-align: center; color: #666; font-size: 0.7rem; flex: 1; cursor: pointer; }
+        .nav-item.active { color: #0d6efd; }
+        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 2px; }
         
         /* Scanner Overlay */
         .scanner-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 2000; display: none; flex-direction: column; justify-content: center; }
         #reader { width: 100%; max-height: 60vh; }
-        
-        /* Spinner */
-        .spinner-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index: 3000; display:none; justify-content:center; align-items:center; flex-direction:column; color:white;}
 
-        /* Feature List Modal */
-        .feature-list { font-size: 0.85rem; color: #aaa; }
-        .feature-list li { margin-bottom: 5px; }
+        /* Tax Display */
+        .tax-display { font-size: 0.9rem; color: #ffc107; margin-left: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="loadingSpinner" class="spinner-overlay">
-    <div class="spinner-border text-primary" role="status"></div>
-    <div class="mt-2">検索中...</div>
-</div>
-
 <div class="app-container">
     <div class="header d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart3"></i> SmartPrice <span class="badge bg-danger" style="font-size:0.5rem">v4.1</span></h5>
-        <button class="btn btn-sm btn-outline-secondary" onclick="toggleFeatures()"><i class="bi bi-info-circle"></i></button>
+        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart3"></i> Smart Price v5</h5>
+        <button class="btn btn-sm btn-outline-secondary" onclick="exportData()"><i class="bi bi-box-arrow-up"></i></button>
     </div>
     
     <div class="status-bar">
         <span id="storeName"><i class="bi bi-geo-alt"></i> ストア未定</span>
-        <button class="btn btn-sm btn-outline-info py-0" style="font-size:0.75rem" onclick="getLocation()"><i class="bi bi-arrow-clockwise"></i> 更新</button>
+        <button class="btn btn-sm btn-outline-info py-0" style="font-size:0.75rem" onclick="getLocation()">更新</button>
     </div>
 
     <div id="mainView" class="p-3">
-        <div class="row g-2 mb-3">
-            <div class="col-8">
-                <button class="btn btn-primary btn-xl shadow h-100" onclick="startScanner()">
-                    <i class="bi bi-upc-scan"></i> スキャン
+        <div class="row g-2 mb-4">
+            <div class="col-7">
+                <button class="btn btn-primary btn-menu btn-scan shadow" onclick="startScanner()">
+                    <i class="bi bi-upc-scan fs-1 mb-2"></i> スキャン
                 </button>
             </div>
-            <div class="col-4">
-                <button class="btn btn-outline-light btn-xl h-100" style="font-size:1rem; padding:5px;" onclick="showVeggieMenu()">
-                    <i class="bi bi-basket"></i><br>手動
+            <div class="col-5">
+                <button class="btn btn-secondary btn-menu btn-manual shadow" onclick="showVeggieMenu()">
+                    <i class="bi bi-keyboard fs-1 mb-2"></i> 手入力
                 </button>
             </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-2">
-            <h6 class="m-0 text-secondary">履歴</h6>
-            <div class="btn-group btn-group-sm">
-                <a href="https://www.google.com" target="_blank" class="btn btn-outline-dark text-muted"><i class="bi bi-google"></i></a>
-                <a href="https://paypay.ne.jp/" target="_blank" class="btn btn-outline-dark text-muted">PayPay</a>
-            </div>
-        </div>
+        <h6 class="text-secondary border-bottom border-secondary pb-2 mb-2">最近の履歴</h6>
         <div id="historyList"></div>
     </div>
 
@@ -99,52 +86,48 @@
             <h5 class="text-white">商品カテゴリー</h5>
             <button class="btn btn-sm btn-secondary" onclick="showHome()">戻る</button>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;" id="veggieGrid"></div>
+        <div id="veggieGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
     </div>
 
     <div id="formView" class="p-3" style="display:none;">
         <div class="card shadow">
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <span>商品情報</span>
+                <span>記録</span>
                 <button class="btn btn-sm btn-close btn-close-white" onclick="closeForm()"></button>
             </div>
             <div class="card-body">
                 <input type="hidden" id="inputBarcode">
                 
-                <div class="d-flex mb-3 align-items-center">
-                    <div style="position:relative; width:70px; height:70px; margin-right:10px;">
-                        <img id="previewImg" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="width:100%; height:100%; object-fit:cover; border-radius:8px; background:#333;">
-                        <button class="btn btn-sm btn-light position-absolute bottom-0 end-0 p-0" style="width:24px;height:24px;" onclick="document.getElementById('cameraInput').click()"><i class="bi bi-camera"></i></button>
+                <div class="d-flex mb-3">
+                    <div style="position:relative; width:80px; height:80px; margin-right:10px;">
+                        <img id="previewImg" src="" style="width:100%; height:100%; object-fit:cover; border-radius:8px; background:#444;">
+                        <button class="btn btn-sm btn-light position-absolute bottom-0 end-0 p-0" style="width:28px;height:28px;" onclick="document.getElementById('cameraInput').click()"><i class="bi bi-camera-fill"></i></button>
                     </div>
                     <input type="file" id="cameraInput" capture="environment" accept="image/*" style="display:none" onchange="handleImage(this)">
                     
                     <div class="flex-grow-1">
-                        <div class="input-group input-group-sm mb-1">
-                            <input type="text" id="inputName" class="form-control fw-bold" placeholder="商品名(省略可)">
-                            <button class="btn btn-outline-secondary" onclick="startVoiceInput()"><i class="bi bi-mic"></i></button>
-                        </div>
-                        <button class="btn btn-sm btn-outline-info w-100" onclick="searchWeb('image')" style="font-size:0.7rem;"><i class="bi bi-stars"></i> AI画像検索</button>
+                        <input type="text" id="inputName" class="form-control fw-bold mb-2" placeholder="商品名">
+                        <button class="btn btn-sm btn-outline-info w-100" onclick="searchWeb('image')"><i class="bi bi-search"></i> 画像検索</button>
                     </div>
                 </div>
 
                 <div class="mb-3">
-                    <label class="small text-secondary">価格入力</label>
+                    <label class="small text-secondary">税抜価格を入力 <span class="badge bg-warning text-dark">自動で8%計算</span></label>
                     <div class="input-group">
                         <span class="input-group-text bg-dark text-secondary">¥</span>
-                        <input type="number" id="inputPrice" class="form-control form-control-lg fw-bold text-end text-warning" style="font-size:1.8rem;" placeholder="0" inputmode="numeric">
+                        <input type="number" id="inputPrice" class="form-control form-control-lg fw-bold text-end text-white" style="font-size:2rem;" placeholder="0" inputmode="numeric" oninput="calcTax()">
                     </div>
-                    <div class="d-flex gap-2 mt-2">
-                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="addTax(1.08)">+税8%</button>
-                        <button class="btn btn-sm btn-outline-secondary flex-fill" onclick="addTax(1.10)">+税10%</button>
+                    <div class="text-end mt-1">
+                        <span id="taxResult" class="tax-display">税込 -- 円</span>
                     </div>
                 </div>
                 
                 <div class="mb-3">
-                    <input type="text" id="inputNote" class="form-control form-control-sm" placeholder="メモ (g/個数/特売日)">
+                    <input type="text" id="inputNote" class="form-control" placeholder="メモ">
                 </div>
 
-                <div id="statsBox" class="alert alert-dark border-secondary d-none py-2">
-                    <div class="d-flex justify-content-between text-center" style="font-size:0.8rem;">
+                <div id="statsBox" class="alert alert-dark border-secondary d-none py-2 mb-3">
+                    <div class="d-flex justify-content-between text-center small">
                         <div class="text-danger">底値<br><span class="fs-6 fw-bold" id="valLow">--</span></div>
                         <div class="text-white">平均<br><span class="fs-6" id="valAvg">--</span></div>
                         <div class="text-secondary">前回<br><span class="fs-6" id="valLast">--</span></div>
@@ -152,31 +135,14 @@
                 </div>
 
                 <div class="d-grid">
-                    <button class="btn btn-primary btn-lg" onclick="saveDataEntry()">保存する</button>
+                    <button class="btn btn-primary btn-lg" onclick="saveDataEntry()">保存する (税込で記録)</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="featuresView" class="p-4" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.95); z-index:3000; overflow-y:auto;">
-        <h5 class="text-white mb-3">搭載機能リスト v4.1</h5>
-        <ul class="feature-list text-white">
-            <li>✅ <strong>【New】アプリアイコン実装</strong></li>
-            <li>✅ <strong>バーコードスキャン:</strong> カメラで瞬時に読み取り</li>
-            <li>✅ <strong>AI商品検索:</strong> ネットから商品名を自動取得(一部)</li>
-            <li>✅ <strong>画像メモ:</strong> 商品写真を撮影して保存</li>
-            <li>✅ <strong>税計算ボタン:</strong> ワンタップで8%/10%を加算</li>
-            <li>✅ <strong>底値・平均計算:</strong> 過去データを自動分析</li>
-            <li>✅ <strong>GPS店舗特定:</strong> 今いる店を自動判別</li>
-            <li>✅ <strong>お気に入り管理:</strong> 定番商品をフィルタリング</li>
-            <li>✅ <strong>ダークモード:</strong> バッテリー節約設計</li>
-            <li>✅ <strong>データ書き出し:</strong> バックアップ機能</li>
-        </ul>
-        <button class="btn btn-outline-light w-100 mt-4" onclick="toggleFeatures()">閉じる</button>
-    </div>
-
     <div id="scannerOverlay" class="scanner-overlay">
-        <div class="text-white text-center py-2 bg-dark">バーコードを合わせてください</div>
+        <div class="text-white text-center py-2 bg-dark">バーコードを枠内へ</div>
         <div id="reader"></div>
         <div class="text-center p-3">
             <button class="btn btn-danger w-50" onclick="stopScanner()">閉じる</button>
@@ -186,65 +152,33 @@
     <div class="nav-bottom">
         <div class="nav-item active" onclick="showHome()"><i class="bi bi-house-door-fill"></i>ホーム</div>
         <div class="nav-item" onclick="filterFavs()"><i class="bi bi-star-fill"></i>定番</div>
-        <div class="nav-item" onclick="exportData()"><i class="bi bi-box-arrow-up"></i>保存</div>
     </div>
 </div>
 
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
-    // --- App Core ---
-    const DB_KEY = 'smart_price_db_v4';
+    const DB_KEY = 'smart_price_db_v5';
     let appData = { products: {}, stores: [] };
     let currentStore = "未設定";
     let scanner = null;
     let isFavFilter = false;
-    let tempImgData = null; // Temporary holder for image
+    let tempImgData = null;
 
+    // --- Core ---
     window.onload = () => {
         if(localStorage.getItem(DB_KEY)) appData = JSON.parse(localStorage.getItem(DB_KEY));
         renderHistory();
         initVeggies();
     };
-
-    function saveDB() {
-        try {
-            localStorage.setItem(DB_KEY, JSON.stringify(appData));
-            renderHistory();
-        } catch(e) {
-            alert("容量がいっぱいです。古い写真やデータを整理してください。");
-        }
-    }
+    function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(appData)); renderHistory(); }
 
     // --- Views ---
-    function showHome() {
-        isFavFilter = false;
-        toggleView('mainView');
-        renderHistory();
-        updateNav();
-    }
-    
-    function filterFavs() {
-        isFavFilter = true;
-        toggleView('mainView');
-        renderHistory();
-        updateNav();
-    }
-
-    function toggleView(viewId) {
-        ['mainView','veggieView','formView','featuresView'].forEach(id => {
-            document.getElementById(id).style.display = (id === viewId) ? 'block' : 'none';
-        });
-    }
-
-    function toggleFeatures() {
-        const el = document.getElementById('featuresView');
-        el.style.display = el.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function updateNav() {
-        const navs = document.querySelectorAll('.nav-item');
-        navs[0].classList.toggle('active', !isFavFilter);
-        navs[1].classList.toggle('active', isFavFilter);
+    function showHome() { isFavFilter = false; toggleView('mainView'); renderHistory(); updateNav(); }
+    function filterFavs() { isFavFilter = true; toggleView('mainView'); renderHistory(); updateNav(); }
+    function toggleView(id) { ['mainView','veggieView','formView'].forEach(v => document.getElementById(v).style.display = (v===id)?'block':'none'); }
+    function updateNav() { 
+        document.querySelectorAll('.nav-item')[0].classList.toggle('active', !isFavFilter);
+        document.querySelectorAll('.nav-item')[1].classList.toggle('active', isFavFilter);
     }
 
     // --- Scanner ---
@@ -254,91 +188,76 @@
         scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: {width:250, height:150} }, (decodedText) => {
             stopScanner();
             handleScannedCode(decodedText);
-        }).catch(err => {
-            alert("カメラエラー: " + err);
-            stopScanner();
-        });
+        }).catch(err => { alert("カメラエラー: " + err); stopScanner(); });
     }
-
-    function stopScanner() {
-        if(scanner && scanner.isScanning) scanner.stop();
-        document.getElementById('scannerOverlay').style.display = 'none';
-    }
+    function stopScanner() { if(scanner) scanner.stop(); document.getElementById('scannerOverlay').style.display = 'none'; }
 
     async function handleScannedCode(code) {
-        if (appData.products[code]) {
-            openForm(code, appData.products[code].name);
-            return;
-        }
-        // Auto Fetch
-        document.getElementById('loadingSpinner').style.display = 'flex';
+        if (appData.products[code]) { openForm(code, appData.products[code].name); return; }
+        // Fetch Logic (Simplified)
         let foundName = "";
         try {
             const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
             const data = await res.json();
             if(data.product) foundName = data.product.product_name_ja || data.product.product_name || "";
         } catch(e) {}
-        document.getElementById('loadingSpinner').style.display = 'none';
         openForm(code, foundName);
     }
 
-    // --- Form & Data ---
-    function openForm(code, defaultName = "") {
+    // --- Form & Tax Logic ---
+    function openForm(code, defaultName="") {
         toggleView('formView');
         const prod = appData.products[code];
         
         document.getElementById('inputBarcode').value = code;
         document.getElementById('inputName').value = prod ? prod.name : defaultName;
         document.getElementById('inputPrice').value = "";
+        document.getElementById('taxResult').innerText = "税込 -- 円";
         document.getElementById('inputNote').value = "";
         
-        // Image Handling
-        const img = document.getElementById('previewImg');
+        // Image
         tempImgData = null;
-        if(prod && prod.image) {
-            img.src = prod.image;
-        } else {
-            img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"; // transparent
-        }
+        const img = document.getElementById('previewImg');
+        img.src = (prod && prod.image) ? prod.image : "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=";
 
         // Stats
         const box = document.getElementById('statsBox');
         if(prod && prod.history.length > 0) {
             box.classList.remove('d-none');
             const prices = prod.history.map(h => h.price);
-            document.getElementById('valLow').innerText = Math.min(...prices) + "円";
-            document.getElementById('valAvg').innerText = Math.floor(prices.reduce((a,b)=>a+b,0)/prices.length) + "円";
-            document.getElementById('valLast').innerText = prod.history[prod.history.length-1].price + "円";
+            document.getElementById('valLow').innerText = Math.min(...prices)+"円";
+            document.getElementById('valAvg').innerText = Math.floor(prices.reduce((a,b)=>a+b,0)/prices.length)+"円";
+            document.getElementById('valLast').innerText = prod.history[prod.history.length-1].price+"円";
+        } else { box.classList.add('d-none'); }
+    }
+
+    // ★ Tax Calculation (Realtime)
+    function calcTax() {
+        const val = document.getElementById('inputPrice').value;
+        if(val) {
+            const taxed = Math.floor(val * 1.08);
+            document.getElementById('taxResult').innerText = `税込 ${taxed} 円`;
         } else {
-            box.classList.add('d-none');
+            document.getElementById('taxResult').innerText = "税込 -- 円";
         }
     }
 
     function closeForm() { showHome(); }
 
-    // --- New Features (Tax, Image, AI) ---
-    function addTax(rate) {
-        const input = document.getElementById('inputPrice');
-        if(input.value) {
-            input.value = Math.floor(parseInt(input.value) * rate);
-        }
-    }
-
     function handleImage(input) {
         if (input.files && input.files[0]) {
             const reader = new FileReader();
             reader.onload = function(e) {
-                // Resize image to save space
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    const maxSize = 100; // Thumbnail size
+                    const maxSize = 150; 
                     let w = img.width, h = img.height;
                     if (w > h) { h *= maxSize/w; w = maxSize; } else { w *= maxSize/h; h = maxSize; }
                     canvas.width = w; canvas.height = h;
                     ctx.drawImage(img, 0, 0, w, h);
-                    tempImgData = canvas.toDataURL('image/jpeg', 0.7);
+                    tempImgData = canvas.toDataURL('image/jpeg', 0.6);
                     document.getElementById('previewImg').src = tempImgData;
                 }
                 img.src = e.target.result;
@@ -347,60 +266,57 @@
         }
     }
 
-    function searchWeb(mode) {
-        const name = document.getElementById('inputName').value;
-        const code = document.getElementById('inputBarcode').value;
-        let q = name || code;
-        if(!q) return;
-        
-        let url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-        if(mode === 'image') url += "&tbm=isch"; // Image search
-        window.open(url, '_blank');
-    }
-
     function saveDataEntry() {
         const code = document.getElementById('inputBarcode').value;
         const name = document.getElementById('inputName').value;
-        const price = document.getElementById('inputPrice').value;
-        if(!price) { alert("価格を入れてください"); return; }
+        const rawPrice = document.getElementById('inputPrice').value;
         
+        if(!rawPrice) { alert("価格を入れてください"); return; }
+        
+        // Auto Save as Tax Included
+        const taxPrice = Math.floor(rawPrice * 1.08);
+
         if(!appData.products[code]) appData.products[code] = { name: name, history: [], favorite: false, image: null };
-        
         if(name) appData.products[code].name = name;
         if(tempImgData) appData.products[code].image = tempImgData;
-        
+
         const now = new Date();
         appData.products[code].history.push({
             date: `${now.getMonth()+1}/${now.getDate()}`,
             timestamp: now.getTime(),
-            price: parseInt(price),
+            price: taxPrice, // Save Tax Included
             store: currentStore,
             note: document.getElementById('inputNote').value
         });
-        
         saveDB();
         closeForm();
     }
-    
-    // --- Veggie & Manual ---
+
+    function searchWeb(mode) {
+        const q = document.getElementById('inputName').value;
+        if(!q) return;
+        let url = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+        if(mode==='image') url += "&tbm=isch";
+        window.open(url, '_blank');
+    }
+
+    // --- Manual Menu ---
     function showVeggieMenu() {
         toggleView('veggieView');
-        const items = ['キャベツ','レタス','きゅうり','トマト','人参','玉ねぎ','じゃがいも','バナナ','豚肉','鶏肉','牛肉','卵','牛乳','パン','豆腐'];
+        const items = ['キャベツ','レタス','きゅうり','トマト','人参','玉ねぎ','じゃがいも','バナナ','豚肉','鶏肉','牛肉','卵','牛乳','パン','豆腐','ビール','洗剤','ティッシュ'];
         const grid = document.getElementById('veggieGrid');
         grid.innerHTML = "";
         items.forEach(v => {
             const d = document.createElement('div');
-            d.className = 'card text-center p-3 mb-0';
-            d.style.cursor = 'pointer';
+            d.className = 'card text-center p-3 mb-0 fw-bold';
             d.innerText = v;
             d.onclick = () => openForm("MANUAL_" + v, v);
             grid.appendChild(d);
         });
     }
-    
-    function initVeggies() {} // Loaded on demand
+    function initVeggies() {}
 
-    // --- Misc ---
+    // --- History & Location ---
     function renderHistory() {
         const list = document.getElementById('historyList');
         list.innerHTML = "";
@@ -415,24 +331,22 @@
             }
         });
         items.sort((a,b) => b.ts - a.ts);
-        
-        if(items.length === 0) { list.innerHTML = '<div class="text-center text-muted mt-5">履歴なし</div>'; return; }
+        if(items.length===0) { list.innerHTML='<div class="text-center text-muted mt-4">履歴なし</div>'; return; }
         
         items.forEach(it => {
             const d = document.createElement('div');
-            d.className = `card p-2 price-card ${it.isCheap ? 'cheap' : 'normal'}`;
+            d.className = `card price-card ${it.isCheap?'cheap':''}`;
             const imgHtml = it.image ? `<img src="${it.image}" class="prod-thumb">` : `<div class="prod-thumb d-flex align-items-center justify-content-center text-secondary"><i class="bi bi-basket"></i></div>`;
-            
             d.innerHTML = `
                 <div class="d-flex align-items-center" onclick="openForm('${it.code}')">
                     ${imgHtml}
                     <div class="flex-grow-1" style="min-width:0;">
-                        <div class="fw-bold text-white text-truncate">${it.name || '名称未設定'}</div>
+                        <div class="fw-bold text-white text-truncate">${it.name || '未設定'}</div>
                         <div class="small text-secondary">${it.store} (${it.date})</div>
                     </div>
-                    <div class="text-end ps-2">
-                        <div class="fs-4 fw-bold text-white">${it.price}<span class="fs-6">円</span></div>
-                        ${it.isCheap ? '<span class="badge bg-danger">安!</span>' : ''}
+                    <div class="text-end">
+                        <div class="fs-3 fw-bold text-white">${it.price}<span class="fs-6">円</span></div>
+                        ${it.isCheap?'<span class="badge bg-danger">安!</span>':''}
                     </div>
                 </div>`;
             list.appendChild(d);
@@ -443,27 +357,13 @@
         if(!navigator.geolocation) return;
         document.getElementById('storeName').innerHTML = '取得中...';
         navigator.geolocation.getCurrentPosition(pos => {
-            // Simple distance check logic here (omitted for brevity, same as v3)
-            // For now just simulation
-            document.getElementById('storeName').innerHTML = `<i class="bi bi-geo-alt-fill text-danger"></i> 現在地付近`;
+            document.getElementById('storeName').innerHTML = `<i class="bi bi-geo-alt-fill text-primary"></i> 現在地付近`;
         });
     }
     
-    function startVoiceInput() {
-        // Simple wrapper
-        const sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if(sr) {
-            const r = new sr();
-            r.lang = 'ja-JP';
-            r.onresult = e => document.getElementById('inputName').value = e.results[0][0].transcript;
-            r.start();
-        } else { alert("音声入力非対応です"); }
-    }
-
     function exportData() {
         const data = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
-        const a = document.createElement('a');
-        a.href = data; a.download = "smart_price_backup.json";
+        const a = document.createElement('a'); a.href = data; a.download = "smart_price.json";
         document.body.appendChild(a); a.click(); a.remove();
     }
 </script>
