@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Smart Price v7.0</title>
+    <title>Smart Price v7.1</title>
     
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojMjhhNzQ1O2JvcmRlci1yYWRpdXM6MjAlIj48cGF0aCBkPSJNMzk4LjEgMjM4LjVjLTcuOSA1NC42LTU0LjYgOTYuOC0xMTEgOTYuOGgtMTY1TDk3LjMgNTFIMzJWMjFoNzYuMmwyNC40IDE2NS41aDI1OS41YzEzLjIgMCAyNC43IDkuMyAyNi45IDIyLjNsMTguOCA5OS43eiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIxNjkuNSIgY3k9IjQxOSIgcj0iMzUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMzU4LjUiIGN5PSI0MTkiIHI9IjM1IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yNTYgODB2NDhtMC0yNEgyMzJtNDggMEgyODAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMzAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==">
     <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBzdHlsZT0iYmFja2dyb3VuZC1jb2xvcjojMjhhNzQ1Ij48cGF0aCBkPSJNMzk4LjEgMjM4LjVjLTcuOSA1NC42LTU0LjYgOTYuOC0xMTEgOTYuOGgtMTY1TDk3LjMgNTFIMzJWMjFoNzYuMmwyNC40IDE2NS41aDI1OS41YzEzLjIgMCAyNC43IDkuMyAyNi45IDIyLjNsMTguOCA5OS43eiIgZmlsbD0id2hpdGUiLz48Y2lyY2xlIGN4PSIxNjkuNSIgY3k9IjQxOSIgcj0iMzUiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iMzU4LjUiIGN5PSI0MTkiIHI9IjM1IiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik0yNTYgODB2NDhtMC0yNEgyMzJtNDggMEgyODAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMzAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPjwvc3ZnPg==">
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
@@ -17,10 +16,10 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
         .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; }
         .header { background: #202020; padding: 12px 15px; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; }
-        .status-bar { font-size: 0.8rem; background: #1e1e1e; color: #aaa; padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; }
+        .status-bar { font-size: 0.8rem; background: #1e1e1e; color: #aaa; padding: 5px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; cursor: pointer; }
         .card { background-color: #1e1e1e; border: 1px solid #333; color: #e0e0e0; margin-bottom: 8px; }
-        .form-control { background-color: #2c2c2c; border: 1px solid #444; color: #fff; font-size: 1.0rem; }
-        .form-control:focus { background-color: #333; color: #fff; border-color: #28a745; box-shadow: none; }
+        .form-control, .form-select { background-color: #2c2c2c; border: 1px solid #444; color: #fff; font-size: 1.0rem; }
+        .form-control:focus, .form-select:focus { background-color: #333; color: #fff; border-color: #28a745; box-shadow: none; }
         
         .price-card { border-left: 5px solid #555; position: relative; overflow: hidden; padding: 10px; }
         .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
@@ -49,53 +48,55 @@
         .input-group-text { background-color: #444; color: #ccc; border: 1px solid #555; font-size: 0.8rem; }
         .badge-maker { font-size: 0.65rem; background: #444; color: #ccc; margin-right: 5px; padding: 2px 5px; border-radius: 3px; }
         
-        .fab {
-            position: fixed; bottom: 80px; right: 20px; width: 56px; height: 56px;
-            border-radius: 50%; background: linear-gradient(135deg, #007bff, #0056b3);
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); z-index: 1000; cursor: pointer;
-            transition: transform 0.2s;
-        }
+        .fab { position: fixed; bottom: 80px; right: 20px; width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, #007bff, #0056b3); color: white; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); z-index: 1000; cursor: pointer; transition: transform 0.2s; }
         .fab:active { transform: scale(0.95); }
-        .fab-menu {
-            position: absolute; bottom: 70px; right: 0; display: none;
-            flex-direction: column; gap: 10px; align-items: center;
-        }
-        .fab-menu .fab-item {
-            width: 45px; height: 45px; border-radius: 50%; background: #28a745;
-            color: white; display: flex; align-items: center; justify-content: center;
-            font-size: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); cursor: pointer;
-        }
-        /* お気に入りボタン */
+        .fab-menu { position: absolute; bottom: 70px; right: 0; display: none; flex-direction: column; gap: 10px; align-items: center; }
+        .fab-menu .fab-item { width: 45px; height: 45px; border-radius: 50%; background: #28a745; color: white; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); cursor: pointer; }
         .btn-fav { border: 1px solid #444; color: #666; background: #2c2c2c; }
         .btn-fav.active { color: #ffc107; border-color: #ffc107; background: #3d3300; }
+        
+        /* Store Selector Modal */
+        #storeModal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:3000; justify-content:center; align-items:center; }
+        .store-list { max-height: 60vh; overflow-y: auto; width: 100%; }
+        .store-item { padding: 15px; border-bottom: 1px solid #444; cursor: pointer; }
+        .store-item:active { background: #333; }
     </style>
 </head>
 <body>
 
-<div id="syncOverlay">
-    <div class="spinner-border text-success" role="status"></div>
-    <div class="mt-3">クラウド同期中...</div>
+<div id="syncOverlay"><div class="spinner-border text-success" role="status"></div><div class="mt-3">クラウド同期中...</div></div>
+
+<div id="storeModal">
+    <div class="card p-0" style="width: 85%; max-width: 400px; background:#222;">
+        <div class="card-header bg-success text-white">ストアを選択</div>
+        <div class="card-body p-0">
+            <div id="storeListContainer" class="store-list text-white"></div>
+            <div class="p-3 border-top border-secondary">
+                <input type="text" id="newStoreInput" class="form-control mb-2" placeholder="新しい店名を入力">
+                <button class="btn btn-outline-light w-100" onclick="setNewStore()">この店にする</button>
+            </div>
+        </div>
+        <div class="card-footer text-center">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('storeModal').style.display='none'">閉じる</button>
+        </div>
+    </div>
 </div>
 
 <div class="app-container">
     <div class="header d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cloud-check"></i> Smart Price v7.0</h5>
+        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cloud-check"></i> Smart Price v7.1</h5>
         <button class="btn btn-sm btn-outline-success" onclick="syncData()"><i class="bi bi-arrow-repeat"></i> 同期</button>
     </div>
-    <div class="status-bar">
-        <span id="storeName"><i class="bi bi-geo-alt"></i> ストア未定</span>
-        <button class="btn btn-sm btn-outline-secondary py-0" style="font-size:0.75rem" onclick="getLocation()">更新</button>
+    
+    <div class="status-bar" onclick="openStoreModal()">
+        <span id="storeNameDisplay"><i class="bi bi-geo-alt"></i> ストア未定 (タップで選択)</span>
+        <i class="bi bi-chevron-down"></i>
     </div>
 
     <div id="mainView" class="p-3">
         <div class="row g-2 mb-4">
-            <div class="col-7">
-                <button class="btn btn-primary btn-menu btn-scan shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1 mb-2"></i> スキャン</button>
-            </div>
-            <div class="col-5">
-                <button class="btn btn-secondary btn-menu btn-manual shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1 mb-2"></i> 手入力</button>
-            </div>
+            <div class="col-7"><button class="btn btn-primary btn-menu btn-scan shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1 mb-2"></i> スキャン</button></div>
+            <div class="col-5"><button class="btn btn-secondary btn-menu btn-manual shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1 mb-2"></i> 手入力</button></div>
         </div>
         <h6 class="text-secondary border-bottom border-secondary pb-2 mb-2 d-flex justify-content-between">
             <span>履歴</span><span class="badge bg-secondary" id="lastSyncTime">未同期</span>
@@ -104,10 +105,7 @@
     </div>
 
     <div id="veggieView" class="p-3" style="display:none;">
-        <div class="d-flex justify-content-between mb-3">
-            <h5 class="text-white">カテゴリー選択</h5>
-            <button class="btn btn-sm btn-secondary" onclick="showHome()">戻る</button>
-        </div>
+        <div class="d-flex justify-content-between mb-3"><h5 class="text-white">カテゴリー選択</h5><button class="btn btn-sm btn-secondary" onclick="showHome()">戻る</button></div>
         <div id="veggieGrid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;"></div>
     </div>
 
@@ -138,7 +136,7 @@
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="small text-secondary">カテゴリー</label>
-                        <select id="inputCategory" class="form-control form-control-sm">
+                        <select id="inputCategory" class="form-select form-select-sm">
                             <option value="">未選択</option>
                             <option value="食品">食品</option>
                             <option value="飲料">飲料</option>
@@ -199,16 +197,16 @@
 
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script>
-    // ▼▼▼ ここにGASのURLを貼り付け ▼▼▼
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbz2VxaJWwtAXNSEdki_JlDpH-4GeaTG6AU6m1JOeiEPnCPLQI8MujraQJ__S82fI6vrIg/exec";
-    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+    // ▼▼▼ 前回の正しいURLをここにそのまま貼ってください ▼▼▼
+    const GAS_API_URL = "https://script.google.com/u/0/home/projects/1QWy_aTkxIQehSF0eAslEkIMG9wvJWUyZvNqfApAxgghwAW5F4U7l-yvG/edit"; 
+    // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
     
     let appData = { products: {}, stores: [] };
     let currentStore = "未設定";
     let scanner = null;
     let isFavFilter = false;
     let tempImgData = null;
-    let isCurrentFavorite = false; // 編集中の商品がお気に入りかどうか
+    let isCurrentFavorite = false;
 
     window.onload = () => {
         if(localStorage.getItem('smart_price_cache')) {
@@ -246,13 +244,43 @@
         } catch(e) { alert("保存エラー: " + e.message); document.getElementById('syncOverlay').style.display = 'none'; }
     }
 
-    // ビュー切替
-    function showHome() { isFavFilter=false; toggleView('mainView'); renderHistory(); updateNav(); }
-    function filterFavs() { isFavFilter=true; toggleView('mainView'); renderHistory(); updateNav(); }
-    function toggleView(id) { ['mainView','veggieView','formView'].forEach(v => document.getElementById(v).style.display = (v===id)?'block':'none'); }
-    function updateNav() { document.querySelectorAll('.nav-item')[0].classList.toggle('active',!isFavFilter); document.querySelectorAll('.nav-item')[1].classList.toggle('active',isFavFilter); }
+    // --- Store Logic ---
+    function openStoreModal() {
+        // Collect unique stores from history
+        const historyStores = new Set();
+        Object.values(appData.products).forEach(p => {
+            if(p.history) p.history.forEach(h => { if(h.store && h.store!=="未設定") historyStores.add(h.store); });
+        });
+        
+        const container = document.getElementById('storeListContainer');
+        container.innerHTML = "";
+        
+        if(historyStores.size === 0) {
+            container.innerHTML = "<div class='p-3 text-secondary text-center'>履歴がありません</div>";
+        } else {
+            historyStores.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'store-item';
+                div.innerHTML = `<i class="bi bi-shop"></i> ${s}`;
+                div.onclick = () => setStore(s);
+                container.appendChild(div);
+            });
+        }
+        document.getElementById('storeModal').style.display = 'flex';
+    }
+    
+    function setNewStore() {
+        const name = document.getElementById('newStoreInput').value;
+        if(name) setStore(name);
+    }
+    
+    function setStore(name) {
+        currentStore = name;
+        document.getElementById('storeNameDisplay').innerHTML = `<i class="bi bi-geo-alt-fill text-success"></i> ${name}`;
+        document.getElementById('storeModal').style.display = 'none';
+    }
 
-    // スキャナー
+    // --- Scanner Logic ---
     function startScanner() {
         document.getElementById('scannerOverlay').style.display = 'flex';
         if(!scanner) scanner = new Html5Qrcode("reader");
@@ -263,13 +291,26 @@
     
     async function handleScannedCode(code) {
         if (appData.products[code]) { openForm(code); return; }
-        let foundName = "", foundMaker = "", foundCat = "";
+        
+        let foundName = "", foundMaker = "", foundCat = "", foundImg = null;
         try {
             const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
             const data = await res.json();
             if(data.product) {
                 foundName = data.product.product_name_ja || data.product.product_name || "";
+                
+                // ★内容量の自動取得 (quantity)
+                if(data.product.quantity) {
+                    foundName += ` (${data.product.quantity})`;
+                }
+                
                 foundMaker = data.product.brands || "";
+                
+                // ★画像の自動取得 (image_url)
+                if(data.product.image_url) {
+                    foundImg = data.product.image_url;
+                }
+                
                 if(data.product.categories_tags) {
                     const tags = data.product.categories_tags.join(",");
                     if(tags.includes("beverages")) foundCat = "飲料";
@@ -277,11 +318,10 @@
                 }
             }
         } catch(e) {}
-        openForm(code, foundName, foundMaker, foundCat);
+        openForm(code, foundName, foundMaker, foundCat, foundImg);
     }
 
-    // フォーム
-    function openForm(code, name="", maker="", cat="") {
+    function openForm(code, name="", maker="", cat="", imgUrl=null) {
         toggleView('formView');
         const prod = appData.products[code];
         document.getElementById('inputBarcode').value = code;
@@ -295,13 +335,18 @@
         document.getElementById('taxResult').innerText = "税込 -- 円";
         document.getElementById('inputNote').value = "";
         
-        // お気に入り状態の反映
         isCurrentFavorite = prod ? (prod.favorite || false) : false;
         updateFavoriteBtn();
         
-        tempImgData = null;
-        document.getElementById('previewImg').src = (prod && prod.image) ? prod.image : "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=";
+        // 画像処理：既存があればそれ、なければネット画像、それもなければ空
+        tempImgData = (prod && prod.image) ? prod.image : imgUrl; 
         
+        if(tempImgData) {
+             document.getElementById('previewImg').src = tempImgData;
+        } else {
+             document.getElementById('previewImg').src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxIDEiPjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=";
+        }
+
         const box = document.getElementById('statsBox');
         if(prod && prod.history.length > 0) {
             box.classList.remove('d-none');
@@ -312,32 +357,11 @@
         } else { box.classList.add('d-none'); }
     }
     
-    // お気に入り機能
-    function toggleFavorite() {
-        isCurrentFavorite = !isCurrentFavorite;
-        updateFavoriteBtn();
-    }
-    function updateFavoriteBtn() {
-        const btn = document.getElementById('btnFav');
-        if(isCurrentFavorite) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    }
+    function toggleFavorite() { isCurrentFavorite = !isCurrentFavorite; updateFavoriteBtn(); }
+    function updateFavoriteBtn() { const btn = document.getElementById('btnFav'); if(isCurrentFavorite) btn.classList.add('active'); else btn.classList.remove('active'); }
     
-    function formatPrice(input) {
-        let value = input.value.replace(/,/g, '');
-        if (!isNaN(value)) {
-            input.value = Number(value).toLocaleString();
-            calcTax();
-        }
-    }
-    function calcTax() {
-        const val = document.getElementById('inputPrice').value.replace(/,/g, '');
-        document.getElementById('taxResult').innerText = val ? `税込 ${Math.floor(val * 1.08).toLocaleString()} 円` : "税込 -- 円";
-    }
-
+    function formatPrice(input) { let value = input.value.replace(/,/g, ''); if (!isNaN(value)) { input.value = Number(value).toLocaleString(); calcTax(); } }
+    function calcTax() { const val = document.getElementById('inputPrice').value.replace(/,/g, ''); document.getElementById('taxResult').innerText = val ? `税込 ${Math.floor(val * 1.08).toLocaleString()} 円` : "税込 -- 円"; }
     function closeForm() { showHome(); }
     
     function handleImage(input) {
@@ -364,13 +388,7 @@
         const code = document.getElementById('inputBarcode').value;
         const name = document.getElementById('inputName').value;
         const rawPrice = document.getElementById('inputPrice').value.replace(/,/g, '');
-        
-        // バリデーション強化
-        if(!code) { alert("商品コードがありません"); return; }
-        if(!rawPrice || isNaN(rawPrice)) { alert("価格を正しく入力してください"); return; }
-        
-        const taxPrice = Math.floor(rawPrice * 1.08);
-        const now = new Date();
+        if(!code || !rawPrice) { alert("入力エラー"); return; }
         
         const payload = {
             code: code,
@@ -378,12 +396,12 @@
             maker: document.getElementById('inputMaker').value,
             category: document.getElementById('inputCategory').value,
             listPrice: document.getElementById('inputListPrice').value,
-            price: taxPrice,
-            date: `${now.getMonth()+1}/${now.getDate()}`,
+            price: Math.floor(rawPrice * 1.08),
+            date: `${new Date().getMonth()+1}/${new Date().getDate()}`,
             store: currentStore,
             note: document.getElementById('inputNote').value,
             image: tempImgData || "",
-            favorite: isCurrentFavorite // 追加: お気に入り状態
+            favorite: isCurrentFavorite
         };
         saveToCloud(payload);
     }
@@ -398,15 +416,18 @@
         });
     }
     function initVeggies() {}
+    
+    function showHome() { isFavFilter=false; toggleView('mainView'); renderHistory(); updateNav(); }
+    function filterFavs() { isFavFilter=true; toggleView('mainView'); renderHistory(); updateNav(); }
+    function toggleView(id) { ['mainView','veggieView','formView'].forEach(v => document.getElementById(v).style.display = (v===id)?'block':'none'); }
+    function updateNav() { document.querySelectorAll('.nav-item')[0].classList.toggle('active',!isFavFilter); document.querySelectorAll('.nav-item')[1].classList.toggle('active',isFavFilter); }
 
     function renderHistory() {
         const list = document.getElementById('historyList'); list.innerHTML = "";
         let items = [];
         Object.keys(appData.products).forEach(k => {
             const p = appData.products[k];
-            // フィルタリング処理
             if(isFavFilter && !p.favorite) return;
-            
             if(p.history.length > 0) {
                 const last = p.history[p.history.length-1];
                 const prices = p.history.map(h=>h.price);
@@ -415,8 +436,7 @@
                     code: k, name: p.name, maker: p.maker, image: p.image, 
                     price: last.price, date: last.date, store: last.store, 
                     isCheap: (last.price <= Math.min(...prices) && p.history.length > 1), 
-                    prevPrice: prevPrice, ts: last.timestamp,
-                    favorite: p.favorite // 表示用に追加
+                    prevPrice: prevPrice, ts: last.timestamp, favorite: p.favorite
                 });
             }
         });
@@ -425,41 +445,19 @@
         items.forEach(it => {
             const d = document.createElement('div'); d.className = `card price-card ${it.isCheap?'cheap':''}`;
             const imgHtml = it.image ? `<img src="${it.image}" class="prod-thumb">` : `<div class="prod-thumb d-flex align-items-center justify-content-center text-secondary"><i class="bi bi-basket"></i></div>`;
-            const makerHtml = it.maker ? `<span class="badge-maker">${it.maker}</span>` : "";
-            const priceChangeHtml = it.prevPrice ? 
-                `<div class="price-change ${it.price > it.prevPrice ? 'up' : 'down'}">
-                    <i class="bi bi-arrow-${it.price > it.prevPrice ? 'up' : 'down'}"></i> ${Math.abs(it.price - it.prevPrice)}円
-                </div>` : '';
             const favIcon = it.favorite ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '';
-            
-            d.innerHTML = `
-            <div class="d-flex align-items-center" onclick="openForm('${it.code}')">
-                ${imgHtml}
-                <div class="flex-grow-1" style="min-width:0;">
-                    <div class="fw-bold text-white text-truncate">${favIcon}${it.name || '未設定'}</div>
-                    <div class="mb-1">${makerHtml}</div>
-                    <div class="small text-secondary">${it.store} (${it.date})</div>
-                </div>
-                <div class="text-end">
-                    <div class="fs-3 fw-bold price">${it.price.toLocaleString()}<span class="fs-6">円</span></div>
-                    ${priceChangeHtml}
-                    ${it.isCheap?'<span class="badge bg-danger">安!</span>':''}
-                </div>
-            </div>`;
+            const priceChangeHtml = it.prevPrice ? `<div class="price-change ${it.price > it.prevPrice ? 'up' : 'down'}"><i class="bi bi-arrow-${it.price > it.prevPrice ? 'up' : 'down'}"></i> ${Math.abs(it.price - it.prevPrice)}円</div>` : '';
+            d.innerHTML = `<div class="d-flex align-items-center" onclick="openForm('${it.code}')">${imgHtml}<div class="flex-grow-1" style="min-width:0;"><div class="fw-bold text-white text-truncate">${favIcon}${it.name || '未設定'}</div><div class="small text-secondary">${it.store} (${it.date})</div></div><div class="text-end"><div class="fs-3 fw-bold price">${it.price.toLocaleString()}<span class="fs-6">円</span></div>${priceChangeHtml}${it.isCheap?'<span class="badge bg-danger">安!</span>':''}</div></div>`;
             list.appendChild(d);
         });
     }
 
     function getLocation() {
         if(!navigator.geolocation) return;
-        document.getElementById('storeName').innerHTML = '取得中...';
-        navigator.geolocation.getCurrentPosition(pos => { document.getElementById('storeName').innerHTML = `<i class="bi bi-geo-alt-fill text-success"></i> 現在地付近`; });
+        document.getElementById('storeNameDisplay').innerHTML = '取得中...';
+        navigator.geolocation.getCurrentPosition(pos => { document.getElementById('storeNameDisplay').innerHTML = `<i class="bi bi-geo-alt-fill text-success"></i> 現在地付近`; });
     }
-
-    function toggleFabMenu() {
-        const menu = document.querySelector('.fab-menu');
-        menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
-    }
+    function toggleFabMenu() { const menu = document.querySelector('.fab-menu'); menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex'; }
 </script>
 </body>
 </html>
