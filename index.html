@@ -10,7 +10,7 @@
 
 <style>
     :root {
-        --primary-color: #E63946; /* メインカラー：赤 */
+        --primary-color: #E63946;
         --secondary-color: #F1FAEE;
         --text-color: #1D3557;
         --accent-color: #457B9D;
@@ -23,9 +23,9 @@
         color: var(--text-color);
         margin: 0;
         padding: 0;
-        -webkit-user-select: none; /* テキスト選択無効化（アプリっぽく） */
+        -webkit-user-select: none;
         user-select: none;
-        overscroll-behavior-y: none; /* バウンススクロール防止 */
+        overscroll-behavior-y: none;
     }
     header {
         background-color: var(--primary-color);
@@ -53,26 +53,18 @@
         padding: 20px;
         max-width: 600px;
         margin: 0 auto;
-        padding-bottom: 80px; /* フッター分空ける */
+        padding-bottom: 80px;
     }
-    
-    /* カードデザイン */
     .card {
         background: white;
         border-radius: 12px;
         padding: 20px;
         margin-bottom: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        transition: transform 0.2s;
     }
-    .card:active {
-        transform: scale(0.98);
-    }
-    
-    /* 商品表示エリア */
     .product-display {
         text-align: center;
-        display: none; /* 初期は非表示 */
+        display: none;
     }
     .product-img {
         max-width: 100%;
@@ -85,10 +77,7 @@
         font-size: 1.4rem;
         font-weight: bold;
         margin-bottom: 10px;
-        color: var(--text-color);
     }
-    
-    /* 価格表示 */
     .price-info {
         display: flex;
         justify-content: space-around;
@@ -97,197 +86,35 @@
         padding: 15px;
         border-radius: 10px;
     }
-    .price-box {
-        text-align: center;
-    }
-    .price-label {
-        font-size: 0.8rem;
-        color: #666;
-        display: block;
-    }
-    .price-value {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
-    .avg-value {
-        color: var(--accent-color);
-    }
-
-    /* 入力フォーム */
-    .input-group {
-        margin-bottom: 15px;
-        text-align: left;
-    }
-    .input-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-        color: #555;
-    }
-    input[type="text"], input[type="number"], input[type="tel"] {
-        width: 100%;
-        padding: 12px;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        font-size: 1.1rem;
-        box-sizing: border-box; /* 枠線を含める */
-        outline: none;
-    }
-    input:focus {
-        border-color: var(--primary-color);
-    }
-
-    /* ボタン類 */
-    .btn {
-        width: 100%;
-        padding: 15px;
-        border: none;
-        border-radius: 30px;
-        font-size: 1.1rem;
-        font-weight: bold;
-        cursor: pointer;
-        margin-top: 10px;
-        transition: opacity 0.2s;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    .btn:active {
-        opacity: 0.8;
-        transform: translateY(2px);
-    }
-    .btn-primary {
-        background-color: var(--primary-color);
-        color: white;
-    }
-    .btn-secondary {
-        background-color: var(--accent-color);
-        color: white;
-    }
-    .btn-outline {
-        background-color: white;
-        border: 2px solid var(--primary-color);
-        color: var(--primary-color);
-    }
-
-    /* スキャンボタン（フローティング） */
-    .scan-fab {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
-        width: 70px;
-        height: 70px;
-        background-color: var(--primary-color);
-        border-radius: 50%;
-        color: white;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        box-shadow: 0 4px 10px rgba(230, 57, 70, 0.4);
-        cursor: pointer;
-        z-index: 100;
-        font-size: 2rem;
-    }
-
-    /* カメラエリア */
-    #camera-area {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: black;
-        z-index: 2000;
-    }
-    #interactive {
-        width: 100%;
-        height: 100%;
-    }
-    .camera-close {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        color: white;
-        font-size: 2rem;
-        z-index: 2001;
-        cursor: pointer;
-        background: rgba(0,0,0,0.5);
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        text-align: center;
-        line-height: 50px;
-    }
-
-    /* モーダル（設定・修正画面） */
-    .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.5);
-        z-index: 3000;
-        justify-content: center;
-        align-items: center;
-    }
-    .modal-content {
-        background: white;
-        padding: 25px;
-        border-radius: 15px;
-        width: 85%;
-        max-width: 400px;
-    }
-    .modal-title {
-        font-size: 1.2rem;
-        font-weight: bold;
-        margin-bottom: 15px;
-        text-align: center;
-    }
-
-    /* 通知トースト */
-    #toast {
-        visibility: hidden;
-        min-width: 250px;
-        background-color: #333;
-        color: #fff;
-        text-align: center;
-        border-radius: 25px;
-        padding: 16px;
-        position: fixed;
-        z-index: 5000;
-        left: 50%;
-        bottom: 30px;
-        transform: translateX(-50%);
-        font-size: 17px;
-    }
-    #toast.show {
-        visibility: visible;
-        animation: fadein 0.5s, fadeout 0.5s 2.5s;
-    }
-    @keyframes fadein {
-        from {bottom: 0; opacity: 0;}
-        to {bottom: 30px; opacity: 1;}
-    }
-    @keyframes fadeout {
-        from {bottom: 30px; opacity: 1;}
-        to {bottom: 0; opacity: 0;}
-    }
-    
-    .sync-status {
-        font-size: 0.8rem;
-        margin-top: 5px;
-        color: #888;
-        text-align: center;
-    }
+    .price-box { text-align: center; }
+    .price-label { font-size: 0.8rem; color: #666; display: block; }
+    .price-value { font-size: 1.5rem; font-weight: bold; color: var(--primary-color); }
+    .avg-value { color: var(--accent-color); }
+    .input-group { margin-bottom: 15px; text-align: left; }
+    .input-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+    input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1.1rem; box-sizing: border-box; outline: none; }
+    input:focus { border-color: var(--primary-color); }
+    .btn { width: 100%; padding: 15px; border: none; border-radius: 30px; font-size: 1.1rem; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .btn-primary { background-color: var(--primary-color); color: white; }
+    .btn-outline { background-color: white; border: 2px solid var(--primary-color); color: var(--primary-color); }
+    .scan-fab { position: fixed; bottom: 30px; right: 30px; width: 70px; height: 70px; background-color: var(--primary-color); border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(230,57,70,0.4); z-index: 100; font-size: 2rem; }
+    #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
+    #interactive { width: 100%; height: 100%; }
+    .camera-close { position: absolute; top: 20px; right: 20px; color: white; font-size: 2rem; z-index: 2001; background: rgba(0,0,0,0.5); border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 25px; border-radius: 15px; width: 85%; max-width: 400px; }
+    #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 25px; padding: 16px; position: fixed; z-index: 5000; left: 50%; bottom: 30px; transform: translateX(-50%); }
+    #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+    @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+    @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    .sync-status { font-size: 0.8rem; margin-top: 5px; color: #888; text-align: center; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 </head>
 <body>
 
 <header>
-    <div>Smart Price <span style="font-size:0.8rem; opacity:0.8;">v8.2</span></div>
+    <div>Smart Price <span style="font-size:0.8rem; opacity:0.8;">v9.0</span></div>
     <button class="settings-btn" onclick="openSettings()">⚙️</button>
 </header>
 
@@ -295,7 +122,7 @@
     <div id="welcome-msg" class="card" style="text-align:center; padding:40px 20px;">
         <div style="font-size:4rem; margin-bottom:20px;">🛒</div>
         <h2>買い物を賢く管理</h2>
-        <p style="color:#666;">右下のボタンを押して<br>バーコードをスキャンしてください</p>
+        <p style="color:#666;">バーコードをスキャンして<br>日用品も食品も底値チェック！</p>
     </div>
 
     <div id="product-card" class="card product-display">
@@ -306,34 +133,28 @@
         <div class="price-info">
             <div class="price-box">
                 <span class="price-label">前回の価格</span>
-                <span id="last-price" class="price-value">--</span>
-                <span style="font-size:1rem;">円</span>
+                <span id="last-price" class="price-value">--</span>円
             </div>
             <div class="price-box" style="border-left: 1px solid #ddd; padding-left: 15px;">
                 <span class="price-label">平均価格</span>
-                <span id="avg-price" class="price-value avg-value">--</span>
-                <span style="font-size:1rem;">円</span>
+                <span id="avg-price" class="price-value avg-value">--</span>円
             </div>
         </div>
-
         <button class="btn btn-primary" onclick="openEditModal()">価格を記録する ✏️</button>
     </div>
-
-    <div class="sync-status" id="sync-msg">データ同期: 待機中</div>
+    <div class="sync-status" id="sync-msg"></div>
 </div>
 
-<div class="scan-fab" onclick="startScanner()">
-    📷
-</div>
+<div class="scan-fab" onclick="startScanner()">📷</div>
 
 <div id="camera-area">
     <div class="camera-close" onclick="stopScanner()">×</div>
-    <div id="interactive" class="viewport"></div>
+    <div id="interactive"></div>
 </div>
 
 <div id="edit-modal" class="modal">
     <div class="modal-content">
-        <div class="modal-title">価格を記録</div>
+        <div style="font-weight:bold; margin-bottom:15px; text-align:center;">価格を記録</div>
         <div class="input-group">
             <label>商品名</label>
             <input type="text" id="edit-name">
@@ -343,290 +164,157 @@
             <input type="tel" id="edit-price" placeholder="例: 198">
         </div>
         <button class="btn btn-primary" onclick="saveProduct()">保存する</button>
-        <button class="btn btn-outline" onclick="closeEditModal()" style="margin-top:10px;">閉じる</button>
+        <button class="btn btn-outline" onclick="closeEditModal()">閉じる</button>
     </div>
 </div>
 
 <div id="settings-modal" class="modal">
     <div class="modal-content">
-        <div class="modal-title">設定</div>
+        <div style="font-weight:bold; margin-bottom:15px; text-align:center;">設定</div>
         <div class="input-group">
-            <label>GAS WebアプリのURL</label>
-            <input type="text" id="gas-url" placeholder="https://script.google.com/..." style="font-size:0.8rem;">
-            <p style="font-size:0.7rem; color:#888;">※スプレッドシート連携用</p>
+            <label>GAS URL (スプレッドシート連携)</label>
+            <input type="text" id="gas-url" placeholder="https://script.google.com/...">
         </div>
         <button class="btn btn-primary" onclick="saveSettings()">設定を保存</button>
-        <button class="btn btn-outline" onclick="exportData()" style="margin-top:10px;">データをコピー(バックアップ)</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()" style="margin-top:10px;">データを復元(読込)</button>
-        <input type="file" id="file-input" style="display:none;" onchange="importData(this)">
-        <button class="btn btn-outline" onclick="closeSettings()" style="margin-top:10px; border-color:#ccc; color:#666;">閉じる</button>
-        <div style="text-align:center; margin-top:15px; font-size:0.8rem; color:#aaa;">Smart Price v8.2</div>
+        <button class="btn btn-outline" onclick="closeSettings()">閉じる</button>
+        <div style="text-align:center; margin-top:15px; font-size:0.7rem; color:#aaa;">Smart Price v9.0 | Powered by Yahoo! JAPAN</div>
     </div>
 </div>
 
-<div id="toast">保存しました</div>
+<div id="toast"></div>
 
 <script>
-    // --- グローバル変数 ---
+    // --- 【設定】なべさんのYahoo! Client ID ---
+    const YAHOO_CLIENT_ID = "dj00aiZpPTViMUdLQzgwODFhQSZzPWNvbnN1bWVyc2VjcmV0Jng9NmQ-";
+
     let db = JSON.parse(localStorage.getItem('smartPriceDB')) || {};
     let currentBarcode = null;
     let gasUrl = localStorage.getItem('smartPriceGasUrl') || '';
 
-    // --- 起動時の処理 ---
     window.onload = function() {
-        if(gasUrl) syncWithGas(); // 起動時に同期
-        
-        // 【v8.2追加】戻る操作での誤終了防止
+        if(gasUrl) syncWithGas();
         history.pushState(null, null, location.href);
-        window.addEventListener('popstate', function(e) {
+        window.addEventListener('popstate', () => {
             history.pushState(null, null, location.href);
-            showToast("アプリ終了はホームボタンを使ってください");
+            showToast("終了はホームボタンを使用してください");
         });
     };
 
-    // --- メイン機能: データ表示 ---
-    function showProduct(code) {
+    async function showProduct(code) {
         currentBarcode = code;
         document.getElementById('welcome-msg').style.display = 'none';
         document.getElementById('product-card').style.display = 'block';
         document.getElementById('product-barcode').innerText = code;
 
         if (db[code]) {
-            // 登録済み
             const item = db[code];
-            document.getElementById('product-name').innerText = item.name;
-            document.getElementById('last-price').innerText = item.lastPrice;
-            document.getElementById('avg-price').innerText = Math.round(item.avgPrice); // 整数に丸める
-            
-            // 画像があれば表示
-            const img = document.getElementById('product-img');
-            if(item.image) {
-                img.src = item.image;
-                img.style.display = 'block';
-            } else {
-                img.src = '';
-                img.style.display = 'none';
-            }
+            updateDisplay(item.name, item.lastPrice, item.avgPrice, item.image);
         } else {
-            // 未登録（ネット検索）
-            fetchProductInfo(code);
+            // 新規商品：ハイブリッド検索
+            await searchProduct(code);
         }
     }
 
-    // 外部API検索 (OpenFoodFacts)
-    async function fetchProductInfo(code) {
-        // いったんリセット
-        document.getElementById('product-name').innerText = "未登録商品";
-        document.getElementById('last-price').innerText = "--";
-        document.getElementById('avg-price').innerText = "--";
-        document.getElementById('product-img').style.display = 'none';
+    function updateDisplay(name, last, avg, imgUrl) {
+        document.getElementById('product-name').innerText = name;
+        document.getElementById('last-price').innerText = last || "--";
+        document.getElementById('avg-price').innerText = avg ? Math.round(avg) : "--";
+        const img = document.getElementById('product-img');
+        if(imgUrl) { img.src = imgUrl; img.style.display = 'block'; }
+        else { img.style.display = 'none'; }
+    }
 
+    async function searchProduct(code) {
+        showToast("商品を探しています...");
+        // 1. まず食品DB (OpenFoodFacts)
         try {
             const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
             const data = await res.json();
             if (data.status === 1) {
-                const name = data.product.product_name_ja || data.product.product_name || "名称不明";
-                document.getElementById('product-name').innerText = name;
-                if(data.product.image_url) {
-                    document.getElementById('product-img').src = data.product.image_url;
-                    document.getElementById('product-img').style.display = 'block';
-                }
-            } else {
-                showToast("商品データが見つかりませんでした");
+                const name = data.product.product_name_ja || data.product.product_name || "不明な商品";
+                updateDisplay(name, null, null, data.product.image_url);
+                openEditModal();
+                return;
             }
-        } catch (e) {
-            console.error(e);
-        }
-        // 未登録なので登録画面をすぐ出す（親切設計）
+        } catch(e) {}
+
+        // 2. 次に日用品DB (Yahoo!ショッピング)
+        try {
+            const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_CLIENT_ID}&jan_code=${code}`);
+            const yData = await yRes.json();
+            if (yData.hits && yData.hits.length > 0) {
+                const item = yData.hits[0];
+                updateDisplay(item.name, null, null, item.image.medium);
+                openEditModal();
+                return;
+            }
+        } catch(e) {}
+
+        updateDisplay("未登録の商品", null, null, "");
         openEditModal();
     }
 
-    // --- 編集・保存機能 (v8.2で修正) ---
     function openEditModal() {
         const nameDisplay = document.getElementById('product-name').innerText;
-        document.getElementById('edit-name').value = (nameDisplay !== "未登録商品") ? nameDisplay : "";
-        
-        // 【v8.2修正】前回の価格が入っていたら入力欄に入れる（空欄にしない）
-        if (db[currentBarcode]) {
-            document.getElementById('edit-price').value = db[currentBarcode].lastPrice;
-        } else {
-            document.getElementById('edit-price').value = "";
-        }
-
+        document.getElementById('edit-name').value = (nameDisplay !== "未登録の商品") ? nameDisplay : "";
+        document.getElementById('edit-price').value = db[currentBarcode] ? db[currentBarcode].lastPrice : "";
         document.getElementById('edit-modal').style.display = 'flex';
-        document.getElementById('edit-price').focus();
-    }
-
-    function closeEditModal() {
-        document.getElementById('edit-modal').style.display = 'none';
     }
 
     function saveProduct() {
         const name = document.getElementById('edit-name').value;
-        const priceStr = document.getElementById('edit-price').value;
-        const price = parseInt(priceStr);
+        const price = parseInt(document.getElementById('edit-price').value);
 
-        // 【v8.2 安全装置】0円、空欄、数値以外は保存しない
         if (!name || isNaN(price) || price <= 0) {
-            alert("正しい価格を入力してください（0円は登録できません）");
+            alert("1円以上の正しい価格を入力してください");
             return;
         }
 
-        // 画像URLの確保
-        let imgUrl = document.getElementById('product-img').src;
-        if(document.getElementById('product-img').style.display === 'none') imgUrl = "";
+        let imgUrl = document.getElementById('product-img').style.display !== 'none' ? document.getElementById('product-img').src : "";
 
-        // データの計算
-        let newItem = {
-            name: name,
-            lastPrice: price,
-            avgPrice: price,
-            count: 1,
-            image: imgUrl,
-            updated: new Date().toISOString()
-        };
+        let item = db[currentBarcode] || { count: 0, avgPrice: 0 };
+        const total = (item.avgPrice * item.count) + price;
+        item.count++;
+        item.avgPrice = total / item.count;
+        item.lastPrice = price;
+        item.name = name;
+        item.image = imgUrl;
 
-        if (db[currentBarcode]) {
-            // 既存データがある場合は平均を更新
-            const old = db[currentBarcode];
-            // 【v8.2計算ロジック】 (現在の平均 * 回数 + 今回) / (回数 + 1)
-            const total = (old.avgPrice * old.count) + price;
-            newItem.count = old.count + 1;
-            newItem.avgPrice = Math.round(total / newItem.count);
-        }
-
-        // 保存
-        db[currentBarcode] = newItem;
+        db[currentBarcode] = item;
         localStorage.setItem('smartPriceDB', JSON.stringify(db));
-        
-        // 画面更新
         showProduct(currentBarcode);
-        closeEditModal();
+        document.getElementById('edit-modal').style.display = 'none';
         showToast("保存しました！");
-
-        // クラウド同期
         if(gasUrl) syncWithGas();
     }
 
-    // --- カメラ・スキャン機能 ---
     function startScanner() {
         document.getElementById('camera-area').style.display = 'block';
         Quagga.init({
-            inputStream : {
-                name : "Live",
-                type : "LiveStream",
-                target: document.querySelector('#interactive'),
-                constraints: {
-                    facingMode: "environment",
-                    width: 640,
-                    height: 480 
-                }
-            },
-            decoder : {
-                readers : ["ean_reader"] // JANコード
-            }
-        }, function(err) {
-            if (err) {
-                console.log(err);
-                alert("カメラの起動に失敗しました");
-                stopScanner();
-                return;
-            }
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { facingMode: "environment" } },
+            decoder: { readers: ["ean_reader"] }
+        }, (err) => {
+            if (err) { alert("カメラエラー"); stopScanner(); return; }
             Quagga.start();
         });
-
-        Quagga.onDetected(function(result) {
-            const code = result.codeResult.code;
-            if(code) {
-                stopScanner();
-                showProduct(code);
-            }
-        });
+        Quagga.onDetected((res) => { stopScanner(); showProduct(res.codeResult.code); });
     }
 
-    function stopScanner() {
-        Quagga.stop();
-        document.getElementById('camera-area').style.display = 'none';
-    }
-
-    // --- 設定・データ管理 ---
-    function openSettings() {
-        document.getElementById('gas-url').value = gasUrl;
-        document.getElementById('settings-modal').style.display = 'flex';
-    }
-    function closeSettings() {
-        document.getElementById('settings-modal').style.display = 'none';
-    }
-    function saveSettings() {
-        gasUrl = document.getElementById('gas-url').value;
-        localStorage.setItem('smartPriceGasUrl', gasUrl);
-        closeSettings();
-        showToast("設定を保存しました");
-        if(gasUrl) syncWithGas();
-    }
-
-    // --- トースト表示 ---
-    function showToast(msg) {
-        const x = document.getElementById("toast");
-        x.innerText = msg;
-        x.className = "show";
-        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
-    }
-
-    // --- GAS連携 (クラウド同期) ---
-    // v8.1: 非同期(バックグラウンド)で邪魔しないように改善
+    function stopScanner() { Quagga.stop(); document.getElementById('camera-area').style.display = 'none'; }
+    function openSettings() { document.getElementById('gas-url').value = gasUrl; document.getElementById('settings-modal').style.display = 'flex'; }
+    function closeSettings() { document.getElementById('settings-modal').style.display = 'none'; }
+    function saveSettings() { gasUrl = document.getElementById('gas-url').value; localStorage.setItem('smartPriceGasUrl', gasUrl); closeSettings(); syncWithGas(); }
+    function showToast(m) { const t = document.getElementById("toast"); t.innerText = m; t.className = "show"; setTimeout(()=>t.className="", 3000); }
+    
     async function syncWithGas() {
         if(!gasUrl) return;
-        const msgEl = document.getElementById('sync-msg');
-        msgEl.innerText = "データ同期中...☁️";
-        
         try {
-            // 送信（POST）
-            await fetch(gasUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(db)
-            });
-
-            // 受信（GET）
-            const res = await fetch(gasUrl);
-            const cloudData = await res.json();
-            
-            // 結合（マージ）
-            db = { ...db, ...cloudData };
+            await fetch(gasUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(db) });
+            const r = await fetch(gasUrl);
+            const d = await r.json();
+            db = { ...db, ...d };
             localStorage.setItem('smartPriceDB', JSON.stringify(db));
-            
-            msgEl.innerText = "同期完了 ✅";
-            setTimeout(() => { msgEl.innerText = ""; }, 3000);
-
-        } catch(e) {
-            console.error(e);
-            msgEl.innerText = "同期エラー ⚠️";
-        }
-    }
-
-    // データのエクスポート・インポート（手動バックアップ用）
-    function exportData() {
-        navigator.clipboard.writeText(JSON.stringify(db));
-        alert("データをクリップボードにコピーしました！\nメールなどに貼り付けて保存してください。");
-    }
-    function importData(input) {
-        const file = input.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const json = JSON.parse(e.target.result);
-                db = json;
-                localStorage.setItem('smartPriceDB', JSON.stringify(db));
-                alert("データを復元しました！");
-                location.reload();
-            } catch(err) {
-                alert("ファイルが壊れているようです");
-            }
-        };
-        reader.readAsText(file);
+        } catch(e) {}
     }
 </script>
 </body>
