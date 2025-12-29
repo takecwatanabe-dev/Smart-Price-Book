@@ -16,9 +16,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; }
-        .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-        .v-badge { background: #000; color: #fff; font-size: 0.6rem; padding: 2px 5px; border-radius: 4px; vertical-align: middle; margin-left: 5px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; overscroll-behavior-y: none; }
+        .app-container { max-width: 600px; margin: 0 auto; min-height: 100vh; position: relative; }
+        .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
         .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
@@ -38,13 +38,14 @@
 
 <div class="app-container">
     <header class="header d-flex justify-content-between align-items-center">
-        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v9.3</span></h5>
+        <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span style="font-size:0.7rem; opacity:0.6;">v9.3</span></h5>
         <button class="btn btn-sm btn-outline-light" onclick="toggleSettings(true)"><i class="bi bi-gear-fill"></i></button>
     </header>
 
     <div class="store-area">
         <div id="store-list" class="store-list">
-            </div>
+            <span class="store-tag">ストア読込中...</span>
+        </div>
     </div>
 
     <div id="main-view" class="p-3">
@@ -64,7 +65,7 @@
             </div>
             <label class="small text-danger fw-bold">購入価格(税抜)</label>
             <input type="number" id="inputPrice" class="form-control form-control-lg text-end" style="font-size:2rem; color:#ff5252;" placeholder="0">
-            <button class="btn btn-danger w-100 py-3 mt-3 fw-bold" onclick="saveData()">保存して戻る</button>
+            <button class="btn btn-danger w-100 py-3 mt-3 fw-bold shadow" onclick="saveData()">保存して戻る</button>
             <button class="btn btn-link text-secondary w-100 mt-2" onclick="showHome()">キャンセル</button>
         </div>
     </div>
@@ -74,7 +75,7 @@
     <div class="modal-content-box text-center">
         <h5 class="text-white mb-4">設定 (v9.3)</h5>
         <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="location.reload(true)">最新に更新</button>
-        <button class="btn btn-outline-danger w-100 mb-4" onclick="forceIconUpdate()">アイコン強制更新</button>
+        <button class="btn btn-outline-danger w-100 mb-4" onclick="location.href=location.href.split('?')[0]+'?v='+Date.now()">アイコン強制更新</button>
         <button class="btn btn-secondary w-100" onclick="toggleSettings(false)">閉じる</button>
     </div>
 </div>
@@ -89,47 +90,39 @@
     let curBarcode = null;
     let scanner = null;
 
-    // レックス式: 起動時にアイコンURLをタイムスタンプで生成
-    (function initIcons() {
+    // レックス修正案: アイコンキャッシュ破壊（起動時に動的にURLをセット）
+    (function initIconCacheBuster() {
         const timestamp = Date.now();
         const iconUrl = `https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=93&t=${timestamp}`;
-        document.getElementById('favicon-link').href = iconUrl;
-        document.getElementById('apple-icon-link').href = iconUrl;
+        const faviconLink = document.getElementById('favicon-link');
+        const appleIconLink = document.getElementById('apple-icon-link');
+        if (faviconLink) faviconLink.href = iconUrl;
+        if (appleIconLink) appleIconLink.href = iconUrl;
     })();
 
+    // レックス修正案: 即座に過去の店舗を表示（GPSを待たない）
     window.onload = () => { 
-        renderStoreListFromHistory(); // 1. まず過去の店を0.1秒で出す
-        initGPS();                   // 2. その後でGPS
-        renderHistory();             // 3. 履歴を出す
+        renderStoreListFromHistory(); // 0.1秒以内に表示
+        initGPS();                   // 非同期で実行
+        renderHistory(); 
     };
 
+    // レックス修正案: 過去の店舗を即座に表示する関数
     function renderStoreListFromHistory() {
         const historyStores = new Set();
-        Object.values(db.products).forEach(p => p.history?.forEach(h => { if(h.store) historyStores.add(h.store); }));
-        updateStoreUI([...historyStores]);
-    }
-
-    function initGPS() {
-        if (!navigator.geolocation) return;
-        const timeoutId = setTimeout(() => {}, 5000); // タイムアウト管理
-
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            clearTimeout(timeoutId);
-            try {
-                const res = await fetch(`https://map.yahooapis.jp/search/local/V1/localSearch?appid=${encodeURIComponent(YAHOO_ID)}&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&dist=0.3&output=json`);
-                const data = await res.json();
-                if (data.Feature) {
-                    const nearby = data.Feature.map(f => f.Name);
-                    const historyStores = new Set();
-                    Object.values(db.products).forEach(p => p.history?.forEach(h => historyStores.add(h.store)));
-                    updateStoreUI([...new Set([...nearby, ...historyStores])]);
+        try {
+            Object.values(db.products).forEach(p => {
+                if (p.history && Array.isArray(p.history)) {
+                    p.history.forEach(h => {
+                        if (h && h.store) historyStores.add(h.store);
+                    });
                 }
-            } catch(e) { console.error("Yahoo API Error", e); }
-        }, () => {}, { timeout: 5000 });
-    }
-
-    function updateStoreUI(all) {
-        if(!all.length) all.push("未設定");
+            });
+        } catch(e) { console.error('履歴読み込みエラー:', e); }
+        
+        const all = Array.from(historyStores);
+        if (!all.length) all.push("未設定");
+        
         const listDiv = document.getElementById('store-list');
         listDiv.innerHTML = "";
         all.forEach((name, i) => {
@@ -145,18 +138,73 @@
         });
     }
 
+    // レックス修正案: GPS取得の堅牢化（タイムアウト5秒）
+    function initGPS() {
+        if (!navigator.geolocation) return;
+
+        const timeoutId = setTimeout(() => {
+            console.log('GPSタイムアウト');
+        }, 5000);
+
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                clearTimeout(timeoutId);
+                try {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    const res = await fetch(`https://map.yahooapis.jp/search/local/V1/localSearch?appid=${encodeURIComponent(YAHOO_ID)}&lat=${lat}&lon=${lon}&dist=0.1&output=json`);
+
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                    const data = await res.json();
+                    if (data && data.Feature) {
+                        const nearbyStores = data.Feature.map(f => f.Name);
+                        addStoresToList(nearbyStores); // GPS店舗を追加
+                    }
+                } catch(e) { console.error('Yahoo APIエラー:', e); }
+            },
+            (error) => { clearTimeout(timeoutId); console.log('GPS取得エラー:', error.message); },
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+        );
+    }
+
+    // レックス修正案: GPS取得成功時に店舗を追加する関数
+    function addStoresToList(nearbyStores) {
+        if (!nearbyStores || nearbyStores.length === 0) return;
+        const listDiv = document.getElementById('store-list');
+        const existingStores = new Set();
+        listDiv.querySelectorAll('.store-tag').forEach(tag => existingStores.add(tag.innerText.trim()));
+
+        nearbyStores.forEach(name => {
+            if (name && !existingStores.has(name)) {
+                const span = document.createElement('span');
+                span.className = 'store-tag';
+                span.innerText = name;
+                span.onclick = () => {
+                    document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
+                    span.classList.add('active'); curStore = name;
+                };
+                listDiv.insertBefore(span, listDiv.firstChild); // 先頭に追加
+            }
+        });
+    }
+
     function startScanner() {
         document.getElementById('camera-area').style.display='block';
         if(!scanner) scanner = new Html5Qrcode("interactive");
         scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, async (d) => { 
-            stopScanner(); curBarcode = d;
+            stopScanner(); 
+            curBarcode = d;
             let p = db.products[d] || { name: "新しい商品", history: [] };
             if(p.name === "新しい商品") {
                 try {
-                    const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_ID}&jan_code=${d}`);
+                    const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(YAHOO_ID)}&jan_code=${d}`);
                     const yData = await yRes.json();
-                    if(yData.hits?.length) { p.name = yData.hits[0].name; p.image = yData.hits[0].image.medium; }
-                } catch(e){}
+                    if(yData.hits?.length) { 
+                        p.name = yData.hits[0].name; 
+                        p.image = yData.hits[0].image?.medium || ""; 
+                    }
+                } catch(e){ console.error('Yahoo検索エラー:', e); }
             }
             document.getElementById('main-view').style.display='none';
             document.getElementById('form-view').style.display='block';
@@ -176,24 +224,34 @@
         db.products[curBarcode] = p;
         localStorage.setItem('smart_price_db', JSON.stringify(db));
         showHome();
+        renderStoreListFromHistory(); // 保存した店舗をリストに反映
     }
 
     function renderHistory() {
         const list = document.getElementById('history-list'); list.innerHTML = "";
-        const items = Object.entries(db.products).sort((a,b) => (b[1].history?.[b[1].history.length-1].ts || 0) - (a[1].history?.[a[1].history.length-1].ts || 0));
-        items.forEach(([code, data]) => {
-            if(!data.history?.length) return;
-            const last = data.history[data.history.length-1];
-            const div = document.createElement('div'); div.className = 'price-card';
-            div.innerHTML = `<div class="d-flex align-items-center"><img src="${data.image}" style="width:40px;height:40px;object-fit:contain;margin-right:10px;background:#fff;border-radius:4px;"><div class="flex-grow-1 small"><b>${data.name}</b><br><span class="text-secondary">${last.store}</span></div><div class="text-danger fw-bold">${last.price}円</div></div>`;
-            list.appendChild(div);
-        });
+        try {
+            const items = Object.entries(db.products).sort((a,b) => {
+                const aLast = a[1].history?.[a[1].history.length-1]?.ts || 0;
+                const bLast = b[1].history?.[b[1].history.length-1]?.ts || 0;
+                return bLast - aLast;
+            });
+            items.forEach(([code, data]) => {
+                if(!data.history?.length) return;
+                const last = data.history[data.history.length-1];
+                const div = document.createElement('div'); div.className = 'price-card';
+                div.innerHTML = `<div class="d-flex align-items-center">
+                    <img src="${data.image || ''}" style="width:40px;height:40px;object-fit:contain;margin-right:10px;background:#fff;border-radius:4px;">
+                    <div class="flex-grow-1 small"><b>${data.name || '商品名なし'}</b><br><span class="text-secondary">${last.store || '店名なし'}</span></div>
+                    <div class="text-danger fw-bold">${last.price || 0}円</div>
+                </div>`;
+                list.appendChild(div);
+            });
+        } catch(e) { console.error('履歴表示エラー:', e); }
     }
 
-    function stopScanner() { if(scanner) scanner.stop(); document.getElementById('camera-area').style.display='none'; }
+    function stopScanner() { if(scanner) { try { scanner.stop(); } catch(e) {} } document.getElementById('camera-area').style.display='none'; }
     function showHome() { document.getElementById('main-view').style.display='block'; document.getElementById('form-view').style.display='none'; renderHistory(); }
     function toggleSettings(s) { document.getElementById('settings-modal').style.display = s ? 'flex' : 'none'; }
-    function forceIconUpdate() { location.href = location.href.split('?')[0] + '?upd=' + Date.now(); }
 </script>
 </body>
 </html>
