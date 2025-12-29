@@ -7,10 +7,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v10.0</title>
+    <title>Smart Price v10.1</title>
     
-    <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=10">
-    <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=10">
+    <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
+    <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -19,37 +19,34 @@
         body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
         .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
-        
         .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
         .store-tag { padding: 8px 16px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.9rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
-
         .btn-menu { height: 110px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; }
-        .btn-scan { background: linear-gradient(135deg, #D50000, #8a0000); color: white; box-shadow: 0 4px 15px rgba(213, 0, 0, 0.4); }
+        .btn-scan { background: linear-gradient(135deg, #D50000, #8a0000); color: white; }
         .btn-manual { background: #333; color: #ccc; border: 1px solid #444; }
-
-        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 10px; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 10px; position: relative; }
         .prod-thumb { width: 50px; height: 50px; object-fit: contain; background: #fff; border-radius: 5px; margin-right: 12px; }
-
+        /* 削除ボタンのスタイル */
+        .del-btn { color: #666; font-size: 1.2rem; padding: 10px; border: none; background: none; }
+        .del-btn:active { color: #D50000; }
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
-        
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
         .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; border: 1px solid #444; }
-        input { width: 100%; padding: 14px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; font-size: 1.1rem; }
+        input { width: 100%; padding: 14px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v10.0</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v10.1</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
 <div class="store-area">
-    <div id="store-list" class="store-list">
-        </div>
+    <div id="store-list" class="store-list"></div>
 </div>
 
 <div class="container p-3">
@@ -71,32 +68,23 @@
         <div class="card p-3">
             <div class="d-flex mb-3 align-items-center">
                 <img id="previewImg" class="prod-thumb" src="">
-                <input type="text" id="inputName" placeholder="商品名" class="flex-grow-1 mb-0">
+                <input type="text" id="inputName" placeholder="商品名" class="flex-grow-1">
             </div>
-            <label class="small text-danger fw-bold mb-1">購入価格 (税抜)</label>
+            <label class="small text-danger fw-bold">価格 (税抜)</label>
             <input type="number" id="inputPrice" placeholder="0" oninput="calcTax()" class="form-control">
             <div id="taxResult" class="text-end text-danger fw-bold mb-3 fs-5">税込 -- 円</div>
-            <button class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-2" onclick="saveData()">保存してホームへ</button>
+            <button class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-2" onclick="saveData()">保存して戻る</button>
             <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
         </div>
     </div>
 </div>
 
-<div id="camera-area">
-    <div id="interactive"></div>
-    <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-4">×</button>
-</div>
+<div id="camera-area"><div id="interactive"></div><button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-4">×</button></div>
 
 <div id="settingsModal" class="modal">
     <div class="modal-content text-center">
-        <h5 class="text-white mb-4">設定 (v10.0)</h5>
-        <button class="btn btn-warning w-100 mb-3 fw-bold py-2" onclick="location.reload(true)">
-            <i class="bi bi-arrow-clockwise"></i> アプリを強制更新
-        </button>
-        <button class="btn btn-outline-danger w-100 mb-4" onclick="window.open(window.location.href, '_blank')">
-            ブラウザで開きアイコン更新
-        </button>
-        <hr class="border-secondary">
+        <h5 class="text-white mb-4">設定 (v10.1)</h5>
+        <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="location.reload(true)">アプリを強制更新</button>
         <input type="text" id="gas-url" placeholder="GAS URL">
         <button class="btn btn-danger w-100 py-2 fw-bold" onclick="saveSettings()">設定保存</button>
         <button class="btn btn-link text-secondary w-100 mt-2" onclick="closeSettings()">閉じる</button>
@@ -105,42 +93,32 @@
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    // データの読み込みを何よりも最優先。エラーが起きても無視して次へ進む
     let db = { products: {} };
     function loadData() {
         try {
-            // smart_price_db もしくは smartPriceDB どちらかにデータがあるはず
             const saved = localStorage.getItem('smart_price_db') || localStorage.getItem('smartPriceDB');
             if (saved) {
                 db = JSON.parse(saved);
-                if (!db.products && db) db = { products: db }; // 旧形式対応
+                if (!db.products && db) db = { products: db };
             }
             if (!db.products) db.products = {};
-        } catch(e) { console.error("Data Restore Error"); }
+        } catch(e) {}
     }
 
     let curBarcode = null;
     let curStore = "未設定";
     let scanner = null;
 
-    window.onload = () => { 
-        loadData();
-        renderStoreList(); 
-        renderHistory(); 
-    };
+    window.onload = () => { loadData(); renderStoreList(); renderHistory(); };
 
     function renderStoreList() {
         const list = document.getElementById('store-list');
         const historyStores = new Set();
-        // なべさんのスマホ内の全履歴から「店名」を洗い出し
         Object.values(db.products).forEach(p => {
-            const hArray = Array.isArray(p.history) ? p.history : [];
-            hArray.forEach(h => { if(h.store) historyStores.add(h.store); });
+            if (p.history) p.history.forEach(h => { if(h.store) historyStores.add(h.store); });
         });
-        
         const allStores = [...historyStores];
         if (allStores.length === 0) allStores.push("未設定");
-
         list.innerHTML = "";
         allStores.forEach((name, i) => {
             const span = document.createElement('span');
@@ -153,35 +131,6 @@
             };
             list.appendChild(span);
         });
-    }
-
-    function openForm(code, nameHint = "") {
-        curBarcode = code;
-        const p = db.products[code] || { name: nameHint || "新しい商品", history: [] };
-        
-        document.getElementById('mainView').style.display = 'none';
-        document.getElementById('veggieView').style.display = 'none';
-        document.getElementById('formView').style.display = 'block';
-        document.getElementById('inputName').value = p.name;
-        document.getElementById('previewImg').src = p.image || "";
-        document.getElementById('inputPrice').value = "";
-    }
-
-    function saveData() {
-        const price = parseInt(document.getElementById('inputPrice').value);
-        if (!price || price <= 0) { alert("価格を入力してください"); return; }
-        if (!db.products[curBarcode]) db.products[curBarcode] = { name: "", history: [] };
-        const p = db.products[curBarcode];
-        p.name = document.getElementById('inputName').value;
-        p.image = document.getElementById('previewImg').src;
-        if (!p.history) p.history = [];
-        p.history.push({ price: Math.floor(price * 1.08), store: curStore, ts: Date.now() });
-        
-        // 念のため両方のキーで保存
-        const json = JSON.stringify(db);
-        localStorage.setItem('smart_price_db', json);
-        localStorage.setItem('smartPriceDB', json);
-        showHome();
     }
 
     function renderHistory() {
@@ -198,27 +147,54 @@
             const last = it.history[it.history.length-1];
             const div = document.createElement('div');
             div.className = 'card p-2 mb-2 d-flex flex-row align-items-center';
-            div.onclick = () => openForm(it.code);
             div.innerHTML = `
-                <img src="${it.image || ''}" class="prod-thumb" onerror="this.style.display='none'">
-                <div class="flex-grow-1 overflow-hidden">
-                    <div class="fw-bold small text-truncate">${it.name}</div>
-                    <div class="text-secondary small">${last.store || ''}</div>
+                <div class="flex-grow-1 d-flex align-items-center" onclick="openForm('${it.code}')">
+                    <img src="${it.image || ''}" class="prod-thumb" onerror="this.style.display='none'">
+                    <div class="overflow-hidden">
+                        <div class="fw-bold small text-truncate" style="max-width:180px;">${it.name || '空白の商品'}</div>
+                        <div class="text-secondary small">${last.store || ''}</div>
+                    </div>
                 </div>
-                <div class="ms-2 text-danger fw-bold">${last.price}円</div>
+                <div class="text-danger fw-bold me-2">${last.price}円</div>
+                <button class="del-btn" onclick="deleteHistory('${it.code}')"><i class="bi bi-trash3"></i></button>
             `;
             list.appendChild(div);
         });
     }
 
-    function showVeggieMenu() {
+    // 【新機能】履歴削除
+    function deleteHistory(code) {
+        if (confirm("この商品の全履歴を削除しますか？")) {
+            delete db.products[code];
+            localStorage.setItem('smart_price_db', JSON.stringify(db));
+            localStorage.setItem('smartPriceDB', JSON.stringify(db));
+            renderHistory();
+            renderStoreList();
+        }
+    }
+
+    function openForm(code, nameHint = "") {
+        curBarcode = code;
+        const p = db.products[code] || { name: nameHint || "新しい商品", history: [] };
         document.getElementById('mainView').style.display = 'none';
-        document.getElementById('veggieView').style.display = 'block';
-        const grid = document.getElementById('veggieGrid'); grid.innerHTML = "";
-        ['キャベツ','レタス','トマト','人参','豚肉','鶏肉','卵','牛乳','パン','洗剤'].forEach(v => {
-            const d = document.createElement('div'); d.className = 'card p-3 text-center fw-bold';
-            d.innerText = v; d.onclick = () => openForm("M_" + v, v); grid.appendChild(d);
-        });
+        document.getElementById('formView').style.display = 'block';
+        document.getElementById('inputName').value = p.name;
+        document.getElementById('previewImg').src = p.image || "";
+        document.getElementById('inputPrice').value = "";
+    }
+
+    function saveData() {
+        const price = parseInt(document.getElementById('inputPrice').value);
+        if (!price || price <= 0) { alert("価格を入力してください"); return; }
+        if (!db.products[curBarcode]) db.products[curBarcode] = { name: "", history: [] };
+        const p = db.products[curBarcode];
+        p.name = document.getElementById('inputName').value;
+        p.image = document.getElementById('previewImg').src;
+        if (!p.history) p.history = [];
+        p.history.push({ price: Math.floor(price * 1.08), store: curStore, ts: Date.now() });
+        localStorage.setItem('smart_price_db', JSON.stringify(db));
+        localStorage.setItem('smartPriceDB', JSON.stringify(db));
+        showHome();
     }
 
     function startScanner() {
