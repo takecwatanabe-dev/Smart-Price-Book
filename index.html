@@ -3,143 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#D50000">
-    <title>Smart Price v9.0</title>
-    
-    <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?cache=90">
-    <link rel="icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?cache=90">
-
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    
+    <title>Smart Price v9.1</title>
+    <link rel="icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=91">
     <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; margin: 0; padding-bottom: 80px; }
-        .header { background: #D50000; padding: 12px 15px; position: sticky; top: 0; z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
-        .v-badge { background: #000; color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
-        
-        .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; }
-        .store-list { display: flex; overflow-x: auto; gap: 8px; padding-bottom: 5px; -webkit-overflow-scrolling: touch; }
-        .store-tag { padding: 8px 16px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; background: #2c2c2c; color: #ccc; font-size: 0.9rem; }
-        .store-tag.active { background: #D50000; color: #fff; border-color: #D50000; }
-
-        .btn-menu { height: 100px; border-radius: 12px; font-weight: bold; width: 100%; border: none; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .btn-scan { background: #D50000; color: #fff; }
-        .btn-manual { background: #333; color: #ccc; }
-
-        .card { background: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 8px; }
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 2000; }
-        .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #1e1e1e; padding: 20px; width: 90%; border-radius: 15px; border: 1px solid #444; }
+        body { background: #121212; color: white; font-family: sans-serif; padding: 20px; }
+        .header { background: #D50000; padding: 15px; margin: -20px -20px 20px -20px; font-weight: bold; display: flex; justify-content: space-between; }
+        .store-list { display: flex; overflow-x: auto; gap: 10px; margin-bottom: 20px; }
+        .tag { background: #333; padding: 10px 20px; border-radius: 20px; white-space: nowrap; border: 1px solid #D50000; }
+        .tag.active { background: #D50000; }
+        .btn { background: #444; color: white; padding: 15px; width: 100%; border: none; border-radius: 10px; margin-bottom: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
+    <div class="header">Smart Price <span>v9.1</span></div>
+    
+    <p>📍 ストアリスト (LocalStorageから強制取得)</p>
+    <div id="list" class="store-list">読み込み中...</div>
 
-<header class="header">
-    <div class="fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v9.0</span></div>
-    <button class="btn btn-sm btn-dark" onclick="toggleSettings(true)"><i class="bi bi-gear-fill"></i></button>
-</header>
+    <button class="btn" style="background:#D50000" onclick="alert('スキャン')">スキャン</button>
+    <button class="btn" onclick="location.reload(true)">アプリを強制更新</button>
+    <button class="btn" onclick="location.href=location.href+'?v='+Date.now()">アイコン強制更新(ブラウザ)</button>
 
-<div class="store-area">
-    <div id="store-list" class="store-list">
-        </div>
-</div>
-
-<div class="container p-3">
-    <div id="main-view">
-        <div class="row g-2 mb-4">
-            <div class="col-7"><button class="btn btn-menu btn-scan" onclick="alert('スキャン準備中')"><i class="bi bi-upc-scan fs-2"></i>スキャン</button></div>
-            <div class="col-5"><button class="btn btn-menu btn-manual" onclick="alert('手入力準備中')"><i class="bi bi-keyboard fs-2"></i>手入力</button></div>
-        </div>
-        <div id="history-list"></div>
-    </div>
-</div>
-
-<div id="settings-modal" class="modal-overlay">
-    <div class="modal-content">
-        <h5 class="mb-4">設定 (v9.0)</h5>
-        <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="location.reload(true)">アプリを強制再読込</button>
-        <button class="btn btn-outline-danger w-100 mb-4" onclick="location.href=location.href+'?upd='+Date.now()">アイコンを強制更新</button>
-        <button class="btn btn-secondary w-100" onclick="toggleSettings(false)">閉じる</button>
-    </div>
-</div>
-
-<script>
-    const YAHOO_ID = "dj00aiZpPTViMUdLQzgwODFhQSZzPWNvbnN1bWVyc2VjcmV0Jng9NmQ-";
-    let db = JSON.parse(localStorage.getItem('smart_price_db')) || { products: {} };
-    let curStore = "未設定";
-
-    window.onload = () => {
-        refreshStoreList(); // 1. まず過去の店を出す
-        startGPS(); // 2. その後、位置情報を探す
-        renderHistory(); // 3. 履歴を出す
-    };
-
-    function refreshStoreList(nearbyStores = []) {
-        const listDiv = document.getElementById('store-list');
-        const historySet = new Set();
-        
-        // 保存データから店名を抽出
-        Object.values(db.products).forEach(p => {
-            p.history?.forEach(h => { if(h.store) historySet.add(h.store); });
-        });
-
-        const allStores = [...new Set([...historySet, ...nearbyStores])];
-        if (allStores.length === 0) allStores.push("お店を登録してください");
-
-        listDiv.innerHTML = "";
-        allStores.forEach((name, i) => {
-            const span = document.createElement('span');
-            span.className = 'store-tag' + (i === 0 ? ' active' : '');
-            span.innerText = name;
-            if (i === 0) curStore = name;
-            span.onclick = () => {
-                document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
-                span.classList.add('active');
-                curStore = name;
-            };
-            listDiv.appendChild(span);
-        });
-    }
-
-    function startGPS() {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            try {
-                const url = `https://map.yahooapis.jp/search/local/V1/localSearch?appid=${YAHOO_ID}&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&dist=0.3&output=json`;
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.Feature) {
-                    refreshStoreList(data.Feature.map(f => f.Name));
-                }
-            } catch(e) {}
-        }, null, { timeout: 5000 });
-    }
-
-    function renderHistory() {
-        const list = document.getElementById('history-list');
-        list.innerHTML = "";
-        const items = Object.entries(db.products);
-        if (items.length === 0) {
-            list.innerHTML = "<div class='text-center mt-5 text-secondary'>履歴がありません</div>";
-            return;
-        }
-        items.forEach(([code, data]) => {
-            if (!data.history?.length) return;
-            const last = data.history[data.history.length - 1];
-            const card = document.createElement('div');
-            card.className = 'card p-2';
-            card.innerHTML = `<div class='d-flex align-items-center'>
-                <div class='flex-grow-1 small'><b>${data.name || '商品'}</b><br><span class='text-secondary'>${last.store}</span></div>
-                <div class='text-danger fw-bold'>${last.price}円</div>
-            </div>`;
-            list.appendChild(card);
-        });
-    }
-
-    function toggleSettings(show) {
-        document.getElementById('settings-modal').style.display = show ? 'block' : 'none';
-    }
-</script>
+    <script>
+        // 外部連携を一切せず、保存されたデータだけを出す
+        window.onload = () => {
+            const db = JSON.parse(localStorage.getItem('smart_price_db')) || { products: {} };
+            const historySet = new Set();
+            Object.values(db.products).forEach(p => {
+                p.history?.forEach(h => { if(h.store) historySet.add(h.store); });
+            });
+            
+            const listDiv = document.getElementById('list');
+            listDiv.innerHTML = "";
+            const stores = [...historySet];
+            if(stores.length === 0) stores.push("過去の店がありません");
+            
+            stores.forEach((name, i) => {
+                const s = document.createElement('div');
+                s.className = 'tag' + (i === 0 ? ' active' : '');
+                s.innerText = name;
+                listDiv.appendChild(s);
+            });
+        };
+    </script>
 </body>
 </html>
