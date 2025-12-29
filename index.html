@@ -7,38 +7,44 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v9.7</title>
+    <title>Smart Price v9.8</title>
     
-    <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=97">
-    <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=97">
+    <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=98">
+    <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png?v=98">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     
     <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
+        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; }
         .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
+        
+        /* 店舗リスト */
         .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
         .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
-        .btn-menu { height: 110px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; transition: 0.1s; }
+
+        .btn-menu { height: 110px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; }
         .btn-scan { background: linear-gradient(135deg, #D50000, #8a0000); color: white; }
         .btn-manual { background: #333; color: #ccc; border: 1px solid #444; }
+
         .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 10px; }
         .prod-thumb { width: 50px; height: 50px; object-fit: contain; background: #fff; border-radius: 5px; margin-right: 12px; }
+
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
+        
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
-        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 90%; border: 1px solid #444; }
-        input { width: 100%; padding: 12px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; }
+        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 90%; max-width: 400px; border: 1px solid #444; }
+        input { width: 100%; padding: 14px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v9.7</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v9.8</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -50,8 +56,8 @@
 <div class="container p-3">
     <div id="mainView">
         <div class="row g-2 mb-4">
-            <div class="col-7"><button class="btn btn-menu btn-scan" onclick="startScanner()"><i class="bi bi-upc-scan fs-1 mb-1"></i>スキャン</button></div>
-            <div class="col-5"><button class="btn btn-menu btn-manual" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1 mb-1"></i>手入力</button></div>
+            <div class="col-7"><button id="scanBtn" class="btn btn-menu btn-scan" onclick="startScanner()"><i class="bi bi-upc-scan fs-1 mb-1"></i>スキャン</button></div>
+            <div class="col-5"><button id="manualBtn" class="btn btn-menu btn-manual" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1 mb-1"></i>手入力</button></div>
         </div>
         <div id="historyList"></div>
     </div>
@@ -66,24 +72,27 @@
         <div class="card p-3">
             <div class="d-flex mb-3 align-items-center">
                 <img id="previewImg" class="prod-thumb" src="">
-                <input type="text" id="inputName" placeholder="商品名" class="flex-grow-1">
+                <input type="text" id="inputName" placeholder="商品名" class="flex-grow-1 mb-0">
             </div>
-            <label class="small text-danger fw-bold">購入価格(税抜)</label>
-            <input type="number" id="inputPrice" placeholder="0" oninput="calcTax()">
+            <label class="small text-danger fw-bold mb-1">購入価格 (税抜)</label>
+            <input type="number" id="inputPrice" placeholder="0" oninput="calcTax()" class="form-control">
             <div id="taxResult" class="text-end text-danger fw-bold mb-3 fs-5">税込 -- 円</div>
-            <button class="btn btn-danger w-100 py-3 fw-bold" onclick="saveData()">保存して戻る</button>
-            <button class="btn btn-link text-secondary w-100 mt-2" onclick="showHome()">戻る</button>
+            <button class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-2" onclick="saveData()">保存して戻る</button>
+            <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
         </div>
     </div>
 </div>
 
-<div id="camera-area"><div id="interactive"></div><button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-4">×</button></div>
+<div id="camera-area">
+    <div id="interactive"></div>
+    <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-4">×</button>
+</div>
 
 <div id="settingsModal" class="modal">
     <div class="modal-content text-center">
-        <h5 class="text-white mb-4">設定 (v9.7)</h5>
-        <button class="btn btn-warning w-100 mb-3 fw-bold py-2" onclick="location.reload(true)">アプリを強制リロード</button>
-        <button class="btn btn-outline-danger w-100 mb-4" onclick="window.open(window.location.href, '_blank')">ブラウザで開く(アイコン更新用)</button>
+        <h5 class="text-white mb-4">設定 (v9.8)</h5>
+        <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="location.reload(true)">アプリを強制リロード</button>
+        <button class="btn btn-outline-danger w-100 mb-4" onclick="window.open(window.location.href, '_blank')">ブラウザで開く (アイコン用)</button>
         <input type="text" id="gas-url" placeholder="GAS URL">
         <button class="btn btn-danger w-100 py-2 fw-bold" onclick="saveSettings()">設定保存</button>
         <button class="btn btn-link text-secondary w-100 mt-2" onclick="closeSettings()">閉じる</button>
@@ -93,16 +102,21 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
     const YAHOO_ID = "dj00aiZpPTViMUdLQzgwODFhQSZzPWNvbnN1bWVyc2VjcmV0Jng9NmQ-";
-    let db = JSON.parse(localStorage.getItem('smart_price_db')) || { products: {} };
-    if (!db.products) db.products = {};
+    // なべさんのスマホ内のデータを安全に読み込む
+    let db = { products: {} };
+    try {
+        const saved = localStorage.getItem('smart_price_db');
+        if (saved) db = JSON.parse(saved);
+        if (!db.products) db.products = {};
+    } catch(e) { console.error("Data Load Error"); }
 
     let curBarcode = null;
     let curStore = "未設定";
     let scanner = null;
 
-    // 起動：何よりも先に「保存されている店名」を表示する
+    // 起動時の処理順序：まずリスト、次にGPS
     window.onload = () => { 
-        renderStoreList([]); 
+        renderStoreList(); 
         initGPS(); 
         renderHistory(); 
     };
@@ -111,16 +125,18 @@
         const list = document.getElementById('store-list');
         const historyStores = new Set();
         Object.values(db.products).forEach(p => {
-            if(p.history) p.history.forEach(h => { if(h.store) historyStores.add(h.store); });
+            if (p.history) p.history.forEach(h => { if(h.store) historyStores.add(h.store); });
         });
+        
         const allStores = [...new Set([...nearby, ...historyStores])];
         if (allStores.length === 0) allStores.push("店名未設定");
+
         list.innerHTML = "";
         allStores.forEach((name, i) => {
             const span = document.createElement('span');
             span.className = 'store-tag' + (i === 0 ? ' active' : '');
             span.innerText = name;
-            if(i === 0) curStore = name;
+            if (i === 0) curStore = name;
             span.onclick = () => {
                 document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
                 span.classList.add('active'); curStore = name;
@@ -143,11 +159,11 @@
     async function openForm(code, nameHint = "") {
         curBarcode = code;
         const p = db.products[code] || { name: nameHint || "新しい商品", history: [] };
-        if(!p.name || p.name === "新しい商品") {
+        if (!p.name || p.name === "新しい商品") {
             try {
                 const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_ID}&jan_code=${code}`);
                 const yData = await yRes.json();
-                if(yData.hits?.length > 0) { p.name = yData.hits[0].name; p.image = yData.hits[0].image.medium; }
+                if (yData.hits?.length > 0) { p.name = yData.hits[0].name; p.image = yData.hits[0].image.medium; }
             } catch(e){}
         }
         document.getElementById('mainView').style.display = 'none';
@@ -155,17 +171,16 @@
         document.getElementById('formView').style.display = 'block';
         document.getElementById('inputName').value = p.name;
         document.getElementById('previewImg').src = p.image || "";
-        document.getElementById('inputPrice').value = "";
     }
 
     function saveData() {
         const price = parseInt(document.getElementById('inputPrice').value);
-        if(!price || price <= 0) { alert("価格を入力してください"); return; }
-        if(!db.products[curBarcode]) db.products[curBarcode] = { name: "", history: [] };
+        if (!price || price <= 0) { alert("価格を入力してください"); return; }
+        if (!db.products[curBarcode]) db.products[curBarcode] = { name: "", history: [] };
         const p = db.products[curBarcode];
         p.name = document.getElementById('inputName').value;
         p.image = document.getElementById('previewImg').src;
-        if(!p.history) p.history = [];
+        if (!p.history) p.history = [];
         p.history.push({ price: Math.floor(price * 1.08), store: curStore, ts: Date.now() });
         localStorage.setItem('smart_price_db', JSON.stringify(db));
         showHome();
@@ -176,7 +191,7 @@
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
         items.sort((a,b) => (b.history?.[b.history.length-1].ts || 0) - (a.history?.[a.history.length-1].ts || 0));
         items.forEach(it => {
-            if(!it.history?.length) return;
+            if (!it.history?.length) return;
             const last = it.history[it.history.length-1];
             const div = document.createElement('div'); div.className = 'card p-2 mb-2 d-flex flex-row align-items-center';
             div.onclick = () => openForm(it.code);
@@ -185,18 +200,6 @@
         });
     }
 
-    function startScanner() {
-        document.getElementById('camera-area').style.display='block';
-        if(!scanner) scanner = new Html5Qrcode("interactive");
-        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (d) => { stopScanner(); openForm(d); })
-        .catch(() => { alert("カメラ起動失敗"); stopScanner(); });
-    }
-    function stopScanner() { if(scanner) scanner.stop(); document.getElementById('camera-area').style.display='none'; }
-    function showHome() { document.getElementById('mainView').style.display = 'block'; document.getElementById('formView').style.display = 'none'; document.getElementById('veggieView').style.display = 'none'; renderHistory(); }
-    function calcTax() { const p = document.getElementById('inputPrice').value; document.getElementById('taxResult').innerText = p ? `税込 ${Math.floor(p*1.08)} 円` : "税込 -- 円"; }
-    function openSettings() { document.getElementById('settingsModal').style.display='flex'; }
-    function closeSettings() { document.getElementById('settingsModal').style.display='none'; }
-    function saveSettings() { localStorage.setItem('gas_url', document.getElementById('gas-url').value); location.reload(true); }
     function showVeggieMenu() {
         document.getElementById('mainView').style.display = 'none';
         document.getElementById('veggieView').style.display = 'block';
@@ -206,6 +209,19 @@
             d.innerText = v; d.onclick = () => openForm("M_" + v, v); grid.appendChild(d);
         });
     }
+
+    function startScanner() {
+        document.getElementById('camera-area').style.display = 'block';
+        if (!scanner) scanner = new Html5Qrcode("interactive");
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (d) => { stopScanner(); openForm(d); })
+        .catch(() => { alert("カメラ起動失敗"); stopScanner(); });
+    }
+    function stopScanner() { if (scanner) scanner.stop(); document.getElementById('camera-area').style.display = 'none'; }
+    function showHome() { document.getElementById('mainView').style.display = 'block'; document.getElementById('formView').style.display = 'none'; document.getElementById('veggieView').style.display = 'none'; renderHistory(); }
+    function calcTax() { const p = document.getElementById('inputPrice').value; document.getElementById('taxResult').innerText = p ? `税込 ${Math.floor(p*1.08)} 円` : "税込 -- 円"; }
+    function openSettings() { document.getElementById('settingsModal').style.display='flex'; }
+    function closeSettings() { document.getElementById('settingsModal').style.display='none'; }
+    function saveSettings() { localStorage.setItem('gas_url', document.getElementById('gas-url').value); location.reload(); }
 </script>
 </body>
 </html>
