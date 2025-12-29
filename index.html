@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v8.6</title>
+    <title>Smart Price v8.7</title>
     
     <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
     <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
@@ -22,7 +22,7 @@
         
         .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 60px; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
-        .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
+        .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
 
         .btn-menu { height: 110px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; }
@@ -32,19 +32,16 @@
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
         
-        #version-bg { font-size: 6rem; color: rgba(255,0,0,0.08); position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 900; z-index: -1; pointer-events: none; }
-
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; justify-content: center; align-items: center; }
         .modal-content { background: #1e1e1e; padding: 20px; border-radius: 15px; width: 90%; border: 1px solid #444; }
         input { width: 100%; padding: 12px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 10px; }
-        
         .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v8.6</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v8.7</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -61,7 +58,6 @@
             <div class="col-5"><button class="btn btn-menu btn-manual" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i>手入力</button></div>
         </div>
         <div id="historyList"></div>
-        <div id="version-bg">v8.6</div>
     </div>
 
     <div id="formView" style="display:none;">
@@ -83,9 +79,9 @@
 
 <div id="settingsModal" class="modal">
     <div class="modal-content">
-        <h5 class="text-white mb-3">設定 (v8.6)</h5>
+        <h5 class="text-white mb-3">設定 (v8.7)</h5>
         <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="forceReload()">強制リロード</button>
-        <button class="btn btn-outline-danger w-100 mb-3" onclick="window.open(window.location.href, '_blank')">ブラウザで開く</button>
+        <button class="btn btn-outline-danger w-100 mb-3" onclick="window.open(window.location.href, '_blank')">ブラウザで開く(アイコン更新用)</button>
         <input type="text" id="gas-url" placeholder="GAS URL">
         <button class="btn btn-danger w-100" onclick="saveSettings()">設定を保存</button>
         <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
@@ -100,35 +96,43 @@
     let curStore = "未設定";
     let scanner = null;
 
+    // 起動時の処理順序を変更
     window.onload = () => { 
-        // 1. 起動した瞬間にまず「過去の店」だけでリストを作る
+        // 1. 真っ先に「過去の店」を出す（0.1秒）
         renderStoreList([]); 
-        // 2. その後、時間をかけてGPSで付近を探す
+        // 2. その後、裏側でGPSを動かす
         initGPS(); 
         renderHistory(); 
     };
 
     function initGPS() {
         if (!navigator.geolocation) return;
-        // タイムアウトを10秒に設定
         navigator.geolocation.getCurrentPosition(async (pos) => {
             try {
                 const res = await fetch(`https://map.yahooapis.jp/search/local/V1/localSearch?appid=${YAHOO_ID}&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&dist=0.1&output=json`);
                 const data = await res.json();
-                renderStoreList(data.Feature ? data.Feature.map(f => f.Name) : []);
-            } catch(e) { console.error(e); }
-        }, (err) => { console.warn(err); }, { timeout: 10000 });
+                if (data.Feature) {
+                    // 見つかったらリストを更新（GPSの結果を優先的に先頭へ）
+                    renderStoreList(data.Feature.map(f => f.Name));
+                }
+            } catch(e) { console.error("GPS API Error"); }
+        }, (err) => { console.warn("GPS Position Error"); }, { timeout: 8000 });
     }
 
     function renderStoreList(nearby) {
         const list = document.getElementById('store-list');
         const historyStores = new Set();
-        // 過去のデータから店名を抽出
-        Object.values(db.products).forEach(p => {
-            if(p.history) p.history.forEach(h => historyStores.add(h.store));
-        });
         
-        // 付近の店 ＋ 過去の店 を合体
+        // 過去のDBから「店名」を漏れなく抽出する
+        if (db.products) {
+            Object.values(db.products).forEach(p => {
+                if(p.history && Array.isArray(p.history)) {
+                    p.history.forEach(h => { if(h.store) historyStores.add(h.store); });
+                }
+            });
+        }
+        
+        // 付近の店 ＋ 過去の店 を合体（重複なし）
         const allStores = [...new Set([...nearby, ...historyStores])];
         if (allStores.length === 0) allStores.push("店名未設定");
 
@@ -140,7 +144,8 @@
             if(i===0) curStore = name;
             span.onclick = () => {
                 document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
-                span.classList.add('active'); curStore = name;
+                span.classList.add('active'); 
+                curStore = name;
             };
             list.appendChild(span);
         });
@@ -149,6 +154,7 @@
     async function openForm(code) {
         curBarcode = code;
         const p = db.products[code] || { name: "", history: [] };
+        // Yahoo!検索連携
         if(!p.name || p.name === "新しい商品") {
             try {
                 const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_ID}&jan_code=${code}`);
@@ -178,7 +184,11 @@
     function renderHistory() {
         const list = document.getElementById('historyList'); list.innerHTML = "";
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-        items.sort((a,b) => (b.history?.[b.history.length-1].ts || 0) - (a.history?.[a.history.length-1].ts || 0));
+        items.sort((a,b) => {
+            const aTs = a.history?.length ? a.history[a.history.length-1].ts : 0;
+            const bTs = b.history?.length ? b.history[b.history.length-1].ts : 0;
+            return bTs - aTs;
+        });
         items.forEach(it => {
             if(!it.history?.length) return;
             const last = it.history[it.history.length-1];
