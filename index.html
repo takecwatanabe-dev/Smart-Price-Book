@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v14.1</title>
+    <title>Smart Price v14.2</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -24,9 +24,6 @@
         .prod-thumb { width: 65px; height: 65px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
         .stats-strip { background: #eee; color: #333; border-radius: 8px; cursor: pointer; }
         .history-item { border-bottom: 1px solid #444; padding: 10px 5px; color: #fff; }
-        .history-item .store-name { color: #ffc107; font-weight: bold; }
-        
-        /* スキャナー画面のスタイル */
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
         .scan-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 250px; height: 150px; border: 2px solid #D50000; box-shadow: 0 0 0 4000px rgba(0,0,0,0.5); z-index: 2001; pointer-events: none; }
@@ -35,7 +32,7 @@
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v14.1</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v14.2</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="location.reload(true)"><i class="bi bi-arrow-clockwise"></i></button>
 </header>
 
@@ -81,21 +78,16 @@
 
             <div id="subHistoryArea" class="mb-3 p-2 bg-dark rounded border border-secondary" style="display:none; max-height:250px; overflow-y:auto;"><div id="subHistoryList"></div></div>
 
-            <button id="saveBtn" class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-3 shadow" onclick="saveData()">保存して戻る</button>
+            <button class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-3 shadow" onclick="saveData()">保存して戻る</button>
             <button class="btn btn-outline-secondary w-100 mb-3" onclick="deleteFullItem()">完全に削除</button>
             <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
         </div>
     </div>
 </div>
 
-<div id="camera-area">
-    <div id="interactive"></div>
-    <div class="scan-overlay"></div>
-    <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-3 shadow">×</button>
-</div>
+<div id="camera-area"><div id="interactive"></div><div class="scan-overlay"></div><button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3 fs-3">×</button></div>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <script>
     let db = { products: {} };
     let curBarcode = null, curStore = "未設定", tempImgData = null, scanner = null;
@@ -108,65 +100,26 @@
         if (!db.products) db.products = {};
     }
 
-    // 【スキャナー起動ロジックの再注入】
     function startScanner() {
         document.getElementById('camera-area').style.display = 'block';
-        if (!scanner) {
-            scanner = new Html5Qrcode("interactive");
-        }
-        scanner.start(
-            { facingMode: "environment" }, 
-            { fps: 10, qrbox: { width: 250, height: 150 } },
-            (decodedText) => {
-                stopScanner();
-                openForm(decodedText);
-            }
-        ).catch(err => {
-            alert("カメラの起動に失敗しました。ブラウザの設定で許可してください。");
-            stopScanner();
-        });
+        if (!scanner) scanner = new Html5Qrcode("interactive");
+        scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, (decodedText) => { stopScanner(); openForm(decodedText); }).catch(() => stopScanner());
     }
 
-    function stopScanner() {
-        if (scanner) {
-            scanner.stop().then(() => {
-                document.getElementById('camera-area').style.display = 'none';
-            });
-        } else {
-            document.getElementById('camera-area').style.display = 'none';
-        }
-    }
-
-    // --- 商品管理ロジック ---
-    function openForm(code, nameHint = "") {
-        curBarcode = code;
-        const p = db.products[code] || { name: nameHint || "", maker: "", history: [], image: "" };
-        document.getElementById('mainView').style.display = 'none';
-        document.getElementById('formView').style.display = 'block';
-        document.getElementById('inputName').value = p.name;
-        document.getElementById('inputMaker').value = p.maker;
-        document.getElementById('inputPrice').value = "";
-        tempImgData = p.image || "";
-        document.getElementById('previewImg').src = tempImgData || "https://placehold.jp/24/333/ccc/80x80.png?text=なし";
-        document.getElementById('subHistoryArea').style.display = 'none';
-        updateStats(p);
-    }
+    function stopScanner() { if (scanner) scanner.stop().then(() => { document.getElementById('camera-area').style.display = 'none'; }); }
 
     function saveData() {
         if (!db.products[curBarcode]) db.products[curBarcode] = { history: [] };
         const p = db.products[curBarcode];
-        p.name = document.getElementById('inputName').value;
-        p.maker = document.getElementById('inputMaker').value;
+        p.name = document.getElementById('inputName').value || "商品名なし";
+        p.maker = document.getElementById('inputMaker').value || "";
         p.image = tempImgData || p.image;
         const priceVal = document.getElementById('inputPrice').value;
-        if (priceVal > 0) {
-            p.history.push({ price: Math.floor(priceVal * 1.08), store: curStore, ts: Date.now() });
-        }
+        if (priceVal > 0) p.history.push({ price: Math.floor(priceVal * 1.08), store: curStore, ts: Date.now() });
         try { localStorage.setItem('smart_price_db', JSON.stringify(db)); } catch(e) {}
         showHome();
     }
 
-    // --- UI/補助機能 (二段表示復刻版) ---
     function renderHistory() {
         const list = document.getElementById('historyList'); list.innerHTML = "";
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
@@ -181,16 +134,18 @@
             list.appendChild(div);
         });
     }
+
+    function openForm(code) { curBarcode = code; const p = db.products[code] || { history: [] }; document.getElementById('mainView').style.display='none'; document.getElementById('formView').style.display='block'; document.getElementById('inputName').value = p.name || ""; document.getElementById('inputMaker').value = p.maker || ""; document.getElementById('previewImg').src = p.image || ""; document.getElementById('subHistoryArea').style.display='none'; updateStats(p); }
     function updateStats(p) { if(p.history?.length) { const prices = p.history.map(h => h.price); document.getElementById('valLow').innerText = Math.min(...prices) + "円"; document.getElementById('valAvg').innerText = Math.floor(prices.reduce((a,b)=>a+b,0)/prices.length) + "円"; document.getElementById('valLast').innerText = prices[prices.length-1] + "円"; } }
     function toggleHistoryList() { const area = document.getElementById('subHistoryArea'); area.style.display = (area.style.display==='none')?'block':'none'; if(area.style.display==='block') renderSubHistory(); }
     function renderSubHistory() { const container = document.getElementById('subHistoryList'); container.innerHTML = ""; db.products[curBarcode].history.slice().reverse().forEach((h, i) => { const div = document.createElement('div'); div.className = "history-item d-flex justify-content-between small"; div.innerHTML = `<span>${h.price}円 (@${h.store})</span> <button class="btn btn-sm text-danger p-0" onclick="deleteHistoryEntry(${db.products[curBarcode].history.length-1-i})"><i class="bi bi-trash"></i></button>`; container.appendChild(div); }); }
     function deleteHistoryEntry(idx) { if(confirm("削除？")) { db.products[curBarcode].history.splice(idx,1); saveData(); } }
     function deleteFullItem() { if(confirm("全削除？")) { delete db.products[curBarcode]; saveData(); } }
     function searchImageWeb() { window.open(`https://www.google.com/search?q=${encodeURIComponent(document.getElementById('inputName').value)}+商品画像&tbm=isch`, '_blank'); }
+    function handleImage(input) { if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = (e) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); const MAX = 150; let w = img.width, h = img.height; if (w > h) { h *= MAX/w; w = MAX; } else { w *= MAX/h; h = MAX; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); tempImgData = canvas.toDataURL('image/jpeg', 0.5); document.getElementById('previewImg').src = tempImgData; }; img.src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
     function renderStoreList() { const list = document.getElementById('store-list'); const historyStores = new Set(); Object.values(db.products).forEach(p => p.history?.forEach(h => { if(h.store) historyStores.add(h.store); })); const allStores = ["未設定", ...historyStores]; list.innerHTML = ""; [...new Set(allStores)].forEach(name => { const span = document.createElement('span'); span.className = 'store-tag' + (name === curStore ? ' active' : ''); span.innerText = name; span.onclick = () => { document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active')); span.classList.add('active'); curStore = name; }; list.appendChild(span); }); }
     function showHome() { document.getElementById('mainView').style.display='block'; document.getElementById('formView').style.display='none'; renderHistory(); renderStoreList(); }
-    function handleImage(input) { if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = (e) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); const MAX = 150; let w = img.width, h = img.height; if (w > h) { h *= MAX/w; w = MAX; } else { w *= MAX/h; h = MAX; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); tempImgData = canvas.toDataURL('image/jpeg', 0.5); document.getElementById('previewImg').src = tempImgData; }; img.src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
-    function showVeggieMenu() { const v = prompt("商品名を入力してください(キャベツ、トマト等)"); if(v) openForm("M_"+v, v); }
+    function showVeggieMenu() { const v = prompt("商品名"); if(v) openForm("M_"+v, v); }
 </script>
 </body>
 </html>
