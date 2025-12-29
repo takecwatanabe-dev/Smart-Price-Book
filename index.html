@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v8.7</title>
+    <title>Smart Price v8.8</title>
     
     <link rel="icon" type="image/png" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
     <link rel="apple-touch-icon" href="https://takecwatanabe-dev.github.io/Smart-Price-Book/icons/icon-512.png">
@@ -20,33 +20,29 @@
         .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; }
         .v-badge { background: rgba(255,255,255,0.2); font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; }
         
-        .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 60px; }
+        .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 65px; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
-        .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
+        .store-tag { padding: 8px 16px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.9rem; background: #2c2c2c; color: #ccc; cursor: pointer; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
 
         .btn-menu { height: 110px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; }
         .btn-scan { background: linear-gradient(135deg, #D50000, #8a0000); color: white; }
         .btn-manual { background: #333; color: #ccc; }
 
-        #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
-        #interactive { width: 100%; height: 100%; }
-        
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 3000; justify-content: center; align-items: center; }
-        .modal-content { background: #1e1e1e; padding: 20px; border-radius: 15px; width: 90%; border: 1px solid #444; }
-        input { width: 100%; padding: 12px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 10px; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; }
+        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 10px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
+        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 90%; border: 1px solid #D50000; }
+        input { width: 100%; padding: 12px; background: #2c2c2c; border: 1px solid #444; color: #fff; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v8.7</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v8.8</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
 <div class="store-area">
-    <div id="gps-status" style="font-size: 0.7rem; color: #888; margin-bottom: 2px;">📍 ストア</div>
     <div id="store-list" class="store-list">
         </div>
 </div>
@@ -55,7 +51,7 @@
     <div id="mainView">
         <div class="row g-2 mb-4">
             <div class="col-7"><button class="btn btn-menu btn-scan" onclick="startScanner()"><i class="bi bi-upc-scan fs-1"></i>スキャン</button></div>
-            <div class="col-5"><button class="btn btn-menu btn-manual" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i>手入力</button></div>
+            <div class="col-5"><button class="btn btn-menu btn-manual" onclick="alert('手入力準備中')"><i class="bi bi-keyboard fs-1"></i>手入力</button></div>
         </div>
         <div id="historyList"></div>
     </div>
@@ -70,7 +66,7 @@
             <input type="number" id="inputPrice" placeholder="0" oninput="calcTax()">
             <div id="taxResult" class="text-end text-danger fw-bold mb-3">税込 -- 円</div>
             <button class="btn btn-danger w-100 py-3 fw-bold" onclick="saveData()">保存して戻る</button>
-            <button class="btn btn-link text-secondary w-100 mt-2" onclick="showHome()">戻る</button>
+            <button class="btn btn-link text-secondary w-100 mt-2" onclick="showHome()">キャンセル</button>
         </div>
     </div>
 </div>
@@ -78,13 +74,18 @@
 <div id="camera-area"><div id="interactive"></div><button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-3">×</button></div>
 
 <div id="settingsModal" class="modal">
-    <div class="modal-content">
-        <h5 class="text-white mb-3">設定 (v8.7)</h5>
-        <button class="btn btn-warning w-100 mb-3 fw-bold" onclick="forceReload()">強制リロード</button>
-        <button class="btn btn-outline-danger w-100 mb-3" onclick="window.open(window.location.href, '_blank')">ブラウザで開く(アイコン更新用)</button>
-        <input type="text" id="gas-url" placeholder="GAS URL">
-        <button class="btn btn-danger w-100" onclick="saveSettings()">設定を保存</button>
-        <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
+    <div class="modal-content text-center">
+        <h5 class="text-white mb-4">設定 (v8.8)</h5>
+        <button class="btn btn-warning w-100 mb-3 fw-bold py-2" onclick="forceReload()">
+            <i class="bi bi-arrow-clockwise"></i> アプリを強制更新
+        </button>
+        <button class="btn btn-outline-danger w-100 mb-3" onclick="window.open(window.location.href, '_blank')">
+            ブラウザで開きアイコン更新
+        </button>
+        <hr class="border-secondary">
+        <input type="text" id="gas-url" placeholder="GAS URL を入力">
+        <button class="btn btn-danger w-100 py-2 fw-bold" onclick="saveSettings()">設定を保存して再起動</button>
+        <button class="btn btn-link text-secondary w-100 mt-2" onclick="closeSettings()">閉じる</button>
     </div>
 </div>
 
@@ -96,14 +97,22 @@
     let curStore = "未設定";
     let scanner = null;
 
-    // 起動時の処理順序を変更
+    // 起動時にまず「過去の店」を出す
     window.onload = () => { 
-        // 1. 真っ先に「過去の店」を出す（0.1秒）
-        renderStoreList([]); 
-        // 2. その後、裏側でGPSを動かす
+        loadHistoryStores(); 
         initGPS(); 
         renderHistory(); 
     };
+
+    function loadHistoryStores() {
+        const historyStores = new Set();
+        if (db.products) {
+            Object.values(db.products).forEach(p => {
+                p.history?.forEach(h => { if(h.store) historyStores.add(h.store); });
+            });
+        }
+        updateStoreUI([...historyStores]);
+    }
 
     function initGPS() {
         if (!navigator.geolocation) return;
@@ -112,30 +121,19 @@
                 const res = await fetch(`https://map.yahooapis.jp/search/local/V1/localSearch?appid=${YAHOO_ID}&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&dist=0.1&output=json`);
                 const data = await res.json();
                 if (data.Feature) {
-                    // 見つかったらリストを更新（GPSの結果を優先的に先頭へ）
-                    renderStoreList(data.Feature.map(f => f.Name));
+                    const nearby = data.Feature.map(f => f.Name);
+                    // 過去の店も合わせて再描画
+                    const historyStores = new Set();
+                    Object.values(db.products).forEach(p => p.history?.forEach(h => historyStores.add(h.store)));
+                    updateStoreUI([...new Set([...nearby, ...historyStores])]);
                 }
-            } catch(e) { console.error("GPS API Error"); }
-        }, (err) => { console.warn("GPS Position Error"); }, { timeout: 8000 });
+            } catch(e) {}
+        }, null, { timeout: 5000 });
     }
 
-    function renderStoreList(nearby) {
+    function updateStoreUI(allStores) {
         const list = document.getElementById('store-list');
-        const historyStores = new Set();
-        
-        // 過去のDBから「店名」を漏れなく抽出する
-        if (db.products) {
-            Object.values(db.products).forEach(p => {
-                if(p.history && Array.isArray(p.history)) {
-                    p.history.forEach(h => { if(h.store) historyStores.add(h.store); });
-                }
-            });
-        }
-        
-        // 付近の店 ＋ 過去の店 を合体（重複なし）
-        const allStores = [...new Set([...nearby, ...historyStores])];
-        if (allStores.length === 0) allStores.push("店名未設定");
-
+        if (allStores.length === 0) allStores.push("その他のお店");
         list.innerHTML = "";
         allStores.forEach((name, i) => {
             const span = document.createElement('span');
@@ -144,17 +142,27 @@
             if(i===0) curStore = name;
             span.onclick = () => {
                 document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
-                span.classList.add('active'); 
-                curStore = name;
+                span.classList.add('active'); curStore = name;
             };
             list.appendChild(span);
         });
     }
 
+    function forceReload() {
+        if(confirm("最新のコードに強制的に入れ替えます。よろしいですか？")) {
+            location.reload(true);
+        }
+    }
+
+    function saveSettings() {
+        localStorage.setItem('gas_url', document.getElementById('gas-url').value);
+        location.reload(true); // 保存後に強制リロード
+    }
+
+    // --- 以下、基本機能 ---
     async function openForm(code) {
         curBarcode = code;
         const p = db.products[code] || { name: "", history: [] };
-        // Yahoo!検索連携
         if(!p.name || p.name === "新しい商品") {
             try {
                 const yRes = await fetch(`https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${YAHOO_ID}&jan_code=${code}`);
@@ -184,11 +192,7 @@
     function renderHistory() {
         const list = document.getElementById('historyList'); list.innerHTML = "";
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-        items.sort((a,b) => {
-            const aTs = a.history?.length ? a.history[a.history.length-1].ts : 0;
-            const bTs = b.history?.length ? b.history[b.history.length-1].ts : 0;
-            return bTs - aTs;
-        });
+        items.sort((a,b) => (b.history?.[b.history.length-1].ts || 0) - (a.history?.[a.history.length-1].ts || 0));
         items.forEach(it => {
             if(!it.history?.length) return;
             const last = it.history[it.history.length-1];
@@ -209,8 +213,6 @@
     function calcTax() { const p = document.getElementById('inputPrice').value; document.getElementById('taxResult').innerText = p ? `税込 ${Math.floor(p*1.08)} 円` : "税込 -- 円"; }
     function openSettings() { document.getElementById('settingsModal').style.display='flex'; }
     function closeSettings() { document.getElementById('settingsModal').style.display='none'; }
-    function forceReload() { location.reload(true); }
-    function saveSettings() { localStorage.setItem('gas_url', document.getElementById('gas-url').value); closeSettings(); }
 </script>
 </body>
 </html>
