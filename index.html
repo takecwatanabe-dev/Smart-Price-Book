@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v16.7</title>
+    <title>Smart Price v16.8</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -19,11 +19,13 @@
         .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
         .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
+        /* 高級な二段表示 */
         .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
         .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
         .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
         .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
         .price-sub { font-size: 0.8rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; }
+        /* スキャナーUI */
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
         .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
@@ -40,7 +42,7 @@
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v16.7</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v16.8</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -78,19 +80,14 @@
 </div>
 
 <div id="settingsModal" class="modal">
-    <div class="modal-content">
-        <h5 class="text-white mb-4 text-center">Firebase 接続設定</h5>
-        <div class="p-2 bg-danger bg-opacity-25 border border-danger rounded small text-white mb-3">
-            <b>解決手順：</b><br>
-            1. FirebaseのURLを貼る<br>
-            2. <b>ルールを true にして公開</b><br>
-            3. 黄色いボタンを押す
-        </div>
-        <input type="text" id="firebase-url" class="form-control-dark w-100 mb-3" placeholder="https://xxx.firebaseio.com">
+    <div class="modal-content text-center">
+        <h5 class="text-white mb-4">クラウド接続設定</h5>
+        <div class="small text-success mb-3">成功したURLをそのまま保持します</div>
+        <input type="text" id="firebase-url" class="form-control-dark w-100 mb-3" placeholder="https://xxx.firebaseio.com/smart_price.json">
         <button id="migrateBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">
-            <i class="bi bi-truck"></i> クラウドへ強制移動(メモリ解放)
+            <i class="bi bi-truck"></i> 全画像をクラウドへ移動(メモリ解放)
         </button>
-        <div id="migrateStatus" class="small text-center mb-3"></div>
+        <div id="migrateStatus" class="small text-secondary mb-3"></div>
         <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
     </div>
 </div>
@@ -107,50 +104,35 @@
 
     function loadLocal() { const saved = localStorage.getItem('smart_price_db'); if (saved) db = JSON.parse(saved); if (!db.products) db.products = {}; }
 
-    // 【自動修正の最終版】
-    function getFinalUrl(url) {
-        let clean = url.trim();
-        if (!clean) return "";
-        clean = clean.replace(/\/+$/, "").replace(/\.json$/, "");
-        return clean + "/smart_price.json";
+    // 【重要】なべさんの入力したURLを一文字も変えずに使用する
+    function getSafeUrl() { return fbUrl.trim(); }
+
+    async function syncFirebase() { 
+        const url = getSafeUrl();
+        if (!url) return;
+        try { const res = await fetch(url); const data = await res.json(); if (data) { db = data; localStorage.setItem('smart_price_db', JSON.stringify(db)); renderHistory(); } } catch(e) {} 
     }
 
-    async function syncFirebase() { if (!fbUrl) return; try { const res = await fetch(getFinalUrl(fbUrl)); const data = await res.json(); if (data) { db = data; localStorage.setItem('smart_price_db', JSON.stringify(db)); renderHistory(); } } catch(e) {} }
-
     async function startMigration() {
-        const inputUrl = document.getElementById('firebase-url').value;
+        const inputUrl = document.getElementById('firebase-url').value.trim();
         if (!inputUrl) return alert("URLを入力してください");
         const btn = document.getElementById('migrateBtn');
         const status = document.getElementById('migrateStatus');
-        btn.disabled = true; status.innerHTML = `<span class="text-info">セキュリティ壁を突破中...</span>`;
-        
-        const targetUrl = getFinalUrl(inputUrl);
+        btn.disabled = true; status.innerHTML = "接続中...";
         
         try {
-            // セキュリティ制限にかかりにくいよう headers を調整
-            const res = await fetch(targetUrl, { 
-                method: 'PUT', 
-                body: JSON.stringify(db),
-                mode: 'cors'
-            });
-            
-            if (res.status === 401 || res.status === 403) {
-                status.innerHTML = `<span class="text-danger">失敗！Firebaseの『ルール』が閉まっています。Geminiの指示通りにルールを書き換えてください。</span>`;
-                btn.disabled = false; return;
-            }
+            const res = await fetch(inputUrl, { method: 'PUT', body: JSON.stringify(db) });
             if (!res.ok) throw new Error("HTTP " + res.status);
             
+            // 成功したURLをロック
             fbUrl = inputUrl; localStorage.setItem('smartPriceFirebaseUrl', inputUrl);
             const lightDb = JSON.parse(JSON.stringify(db));
             Object.values(lightDb.products).forEach(p => { if(p.image && p.image.startsWith('data:')) p.image = "cloud_sync"; });
             localStorage.setItem('smart_price_db', JSON.stringify(lightDb));
             
-            status.innerHTML = `<span class="text-success">大成功！スマホが軽くなりました！</span>`;
+            status.innerHTML = `<span class="text-success">接続成功！メモリを解放しました。</span>`;
             setTimeout(() => location.reload(), 2000);
-        } catch(e) {
-            status.innerHTML = `<span class="text-danger">通信失敗。ネットワークかURLを確認してください。</span>`;
-            btn.disabled = false;
-        }
+        } catch(e) { status.innerHTML = `<span class="text-danger">失敗。URLまたはルールを確認してください。</span>`; btn.disabled = false; }
     }
 
     async function saveData() {
@@ -161,14 +143,19 @@
         p.image = tempImgData || p.image;
         const pr = document.getElementById('inputPrice').value;
         if (pr > 0) p.history.push({ price: Math.floor(pr * 1.08), store: curStore, ts: Date.now() });
+
         try {
-            if (fbUrl) await fetch(getFinalUrl(fbUrl), { method: 'PUT', body: JSON.stringify(db) });
+            const url = getSafeUrl();
+            if (url) {
+                const res = await fetch(url, { method: 'PUT', body: JSON.stringify(db) });
+                if(!res.ok) throw new Error();
+            }
             localStorage.setItem('smart_price_db', JSON.stringify(db));
             showHome();
-        } catch(e) { alert("同期失敗。ルールかURLを確認してください。"); }
+        } catch(e) { alert("同期失敗。設定画面で成功したURLが正しく入っているか確認してください。"); }
     }
 
-    // --- UI制御 (不変の高級UI) ---
+    // --- UI/描画 ---
     function renderHistory() { const list = document.getElementById('historyList'); list.innerHTML = ""; const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] })); items.sort((a,b) => (b.history?.[b.history.length-1]?.ts || 0) - (a.history?.[a.history.length-1]?.ts || 0)); items.forEach(it => { if (!it.history?.length) return; const prices = it.history.map(h => h.price); const last = it.history[it.history.length-1]; const avg = Math.floor(prices.reduce((a,b)=>a+b,0)/prices.length); const low = Math.min(...prices); const div = document.createElement('div'); div.className = `card price-card ${last.price <= avg ? 'cheap' : ''}`; div.onclick = () => openForm(it.code); div.innerHTML = `<div class="d-flex align-items-center"><img src="${it.image || ''}" class="prod-thumb" onerror="this.src='https://placehold.jp/24/333/ccc/68x68.png?text=なし'"><div class="flex-grow-1 overflow-hidden"><div class="fw-bold text-white small text-truncate">${it.name}</div><div class="text-secondary" style="font-size:0.65rem;">${it.maker || ''} / ${last.store}</div></div><div class="text-end ms-2"><div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div><div class="price-sub">${avg}平 / ${low}最</div></div></div>`; list.appendChild(div); }); }
     function openForm(code) { curBarcode = code; const p = db.products[code] || { history: [] }; document.getElementById('mainView').style.display='none'; document.getElementById('formView').style.display='block'; document.getElementById('inputName').value = p.name || ""; document.getElementById('inputMaker').value = p.maker || ""; document.getElementById('inputPrice').value = ""; tempImgData = p.image || ""; document.getElementById('previewImg').src = tempImgData || ""; }
     function openSettings() { document.getElementById('settingsModal').style.display='flex'; document.getElementById('firebase-url').value = fbUrl; }
