@@ -7,24 +7,30 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#D50000">
-    <title>Smart Price v11.9</title>
+    <title>Smart Price v12.0</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
         body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
         .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
         .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
+        
         .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
         .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; }
         .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
+
         .btn-menu { height: 90px; border-radius: 15px; font-weight: bold; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; border:none; }
         .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 10px; overflow: hidden; }
         .price-card { padding: 10px; border-left: 5px solid #444; }
         .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
         .prod-thumb { width: 65px; height: 65px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
-        .btn-manual-back { background: #444; color: #fff; width: 100%; padding: 15px; border-radius: 10px; font-weight: bold; border: none; margin-top: 10px; }
-        #save-status { font-weight: bold; text-align: center; margin-bottom: 10px; display: none; }
+        
+        /* ボタンデザインの明確化 */
+        .btn-save-cloud { background: linear-gradient(135deg, #D50000, #a00000); color: white; width: 100%; padding: 18px; border-radius: 12px; font-weight: bold; border: none; font-size: 1.2rem; }
+        .btn-manual-back { background: #444; color: #ccc; width: 100%; padding: 15px; border-radius: 10px; font-weight: bold; border: 1px solid #555; margin-top: 15px; }
+        
+        #save-status { font-weight: bold; text-align: center; margin: 10px 0; display: none; color: #00ff88; }
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
@@ -34,7 +40,7 @@
 <body>
 
 <header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v11.9</span></h5>
+    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v12.0</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -50,9 +56,9 @@
     </div>
 
     <div id="formView" style="display:none;">
-        <div class="card p-3 shadow-lg">
+        <div class="card p-3 shadow-lg border-0" style="background:#1e1e1e;">
             <div class="d-flex mb-3">
-                <div style="position:relative; width:90px; height:90px; margin-right:12px;">
+                <div style="position:relative; width:95px; height:95px; margin-right:12px;">
                     <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;">
                     <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
                         <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
@@ -66,26 +72,26 @@
                 </div>
             </div>
 
-            <div class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
+            <div class="mb-4 p-3 border rounded border-danger" style="background:#1a1a1a;">
                 <label class="small text-danger fw-bold">購入価格(税抜)</label>
                 <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0" oninput="calcTax()">
                 <div id="taxResult" class="text-end text-danger fw-bold mt-1 small">税込 -- 円</div>
             </div>
 
-            <div id="save-status" class="text-success small">✓ 保存しました</div>
+            <div id="save-status">✓ クラウド同期完了</div>
 
-            <button class="btn btn-danger w-100 py-3 fw-bold fs-5 mb-2 shadow" onclick="saveDataOnly()">① クラウドに保存する</button>
+            <button class="btn-save-cloud shadow" onclick="saveDataManual()">① データをクラウドに保存</button>
             
-            <button class="btn-manual-back shadow" onclick="showHome()">② ホーム画面に戻る</button>
+            <button class="btn-manual-back shadow" onclick="showHome()">② ホーム画面へ戻る</button>
 
-            <button class="btn btn-link text-secondary w-100 mt-4" onclick="deleteFullItem()">この商品を完全に削除</button>
+            <button class="btn btn-link text-secondary w-100 mt-4 small" onclick="deleteFullItem()">この商品を完全に削除</button>
         </div>
     </div>
 </div>
 
 <div id="settingsModal" class="modal">
     <div class="modal-content">
-        <h5 class="text-white mb-4 text-center">設定</h5>
+        <h5 class="text-white mb-4 text-center">設定 (v12.0)</h5>
         <input type="text" id="firebase-url" class="form-control bg-dark text-white border-secondary mb-3" placeholder="Firebase URL">
         <button class="btn btn-danger w-100 py-2 fw-bold" onclick="saveSettings()">設定を保存</button>
         <button class="btn btn-link text-secondary w-100 mt-2" onclick="closeSettings()">閉じる</button>
@@ -102,12 +108,7 @@
     let curBarcode = null, curStore = "未設定", tempImgData = null, scanner = null;
     let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || FB_URL;
 
-    window.onload = () => { 
-        loadLocal(); 
-        pullFromFirebase();
-        renderStoreList(); 
-        renderHistory(); 
-    };
+    window.onload = () => { loadLocal(); pullFromFirebase(); renderStoreList(); renderHistory(); };
 
     function loadLocal() {
         const saved = localStorage.getItem('smart_price_db');
@@ -121,14 +122,13 @@
             if(data && data.products) {
                 db = data;
                 localStorage.setItem('smart_price_db', JSON.stringify(db));
-                renderHistory();
-                renderStoreList();
+                renderHistory(); renderStoreList();
             }
         }).catch(() => {});
     }
 
-    // 【変更】保存だけを行い、画面は戻さない
-    function saveDataOnly() {
+    // 手動保存ロジック
+    function saveDataManual() {
         const priceVal = document.getElementById('inputPrice').value;
         if (!db.products[curBarcode]) db.products[curBarcode] = { history: [] };
         const p = db.products[curBarcode];
@@ -141,30 +141,24 @@
             p.history.push({ price: Math.floor(parseInt(priceVal) * 1.08), store: curStore, ts: Date.now() });
         }
         
-        // ローカル保存
         localStorage.setItem('smart_price_db', JSON.stringify(db));
         
-        // 完了表示
         const status = document.getElementById('save-status');
         status.style.display = 'block';
-        setTimeout(() => { status.style.display = 'none'; }, 3000);
 
-        // クラウド送信
         if(fbUrl) {
             const targetUrl = fbUrl.endsWith('/') ? `${fbUrl}db.json` : `${fbUrl}/db.json`;
             fetch(targetUrl, { method: 'PUT', body: JSON.stringify(db) });
         }
     }
 
-    // 【重要】手動でホーム画面を表示する関数
     function showHome() { 
         document.getElementById('mainView').style.display = 'block'; 
         document.getElementById('formView').style.display = 'none'; 
-        renderHistory(); 
-        renderStoreList();
+        renderHistory(); renderStoreList();
     }
 
-    // --- 以下、基本機能 ---
+    // --- その他UI機能 ---
     function renderStoreList() {
         const list = document.getElementById('store-list'); const historyStores = new Set();
         Object.values(db.products).forEach(p => p.history?.forEach(h => { if(h.store) historyStores.add(h.store); }));
