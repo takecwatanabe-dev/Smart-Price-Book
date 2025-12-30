@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Smart Price v17.4</title>
+    <title>Smart Price v17.5</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -33,11 +33,11 @@
 <body>
 <div class="container">
     <div class="header d-flex justify-content-between align-items-center">
-        <h1>Smart Price v17.4</h1>
+        <h1>Smart Price v17.5</h1>
         <i class="bi bi-gear-fill settings-btn" onclick="openSettings()"></i>
     </div>
     <div class="glass-panel">
-        <div class="form-label-custom">INPUT DATA (Last Update: 2025-12-30 23:25)</div>
+        <div class="form-label-custom">INPUT DATA (Last Update: 2025-12-30 23:35)</div>
         <input type="text" id="itemName" placeholder="商品名を入力">
         <input type="text" id="maker" placeholder="メーカー・店舗">
         <input type="number" id="price" placeholder="価格 (円)">
@@ -60,7 +60,7 @@
 </div>
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    /* Logic Revision: 17.4.202512302325 */
+    /* Internal Logic Refinement: 17.5.202512302335 */
     let db = { products: {} };
     let curBarcode = "MANUAL_" + Date.now();
     let tempImgData = "";
@@ -68,7 +68,7 @@
     let scanner = null;
 
     window.onload = () => { loadLocal(); if(fbUrl) syncFirebase(); renderHistory(); };
-    function loadLocal() { const saved = localStorage.getItem('smart_price_db'); if (saved) db = JSON.parse(saved); }
+    function loadLocal() { const saved = localStorage.getItem('smart_price_db'); if (saved) { try { db = JSON.parse(saved); } catch(e) { console.error("Data corruption"); } } }
     function getSafeFbUrl(url) { if(!url) return ""; let clean = url.trim().replace(/\/+$/, ""); return clean.endsWith(".json") ? clean : clean + "/db.json"; }
 
     async function syncFirebase() {
@@ -76,9 +76,10 @@
         if (!target) return;
         try {
             const res = await fetch(target);
+            if (!res.ok) return;
             const data = await res.json();
             if (data && data.db) { db = data.db; renderHistory(); }
-        } catch(e) { console.error("Firebase Sync Error at 23:25"); }
+        } catch(e) { console.warn("Firebase Offline: v17.5"); }
     }
 
     function handleImage(input) {
@@ -92,9 +93,12 @@
                     let w = img.width, h = img.height;
                     if (w > h) { h *= MAX/w; w = MAX; } else { w *= MAX/h; h = MAX; }
                     canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
                     tempImgData = canvas.toDataURL('image/jpeg', 0.6);
                     document.getElementById('preview-img').src = tempImgData;
+                    // Memory Cleanup
+                    canvas.width = canvas.height = 0;
                 };
                 img.src = e.target.result;
             };
@@ -116,8 +120,9 @@
         const target = getSafeFbUrl(fbUrl);
         if (target) {
             try {
-                await fetch(target, { method: 'PUT', body: JSON.stringify({ db: db }) });
-            } catch(e) { alert("同期失敗。設定を確認してください。"); }
+                const res = await fetch(target, { method: 'PUT', body: JSON.stringify({ db: db }) });
+                if(!res.ok) throw new Error();
+            } catch(e) { console.error("Cloud save failed, local only."); }
         }
         renderHistory();
         document.getElementById('itemName').value = ""; document.getElementById('price').value = "";
@@ -129,9 +134,10 @@
         const list = document.getElementById('listArea');
         list.innerHTML = "";
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-        items.sort((a,b) => b.history[b.history.length-1].ts - a.history[a.history.length-1].ts);
+        items.sort((a,b) => (b.history[b.history.length-1]?.ts || 0) - (a.history[a.history.length-1]?.ts || 0));
         items.forEach(it => {
             const last = it.history[it.history.length-1];
+            if(!last) return;
             const div = document.createElement('div');
             div.className = 'item-card';
             div.innerHTML = `<img src="${it.image || ''}" class="card-img" onerror="this.src='https://placehold.jp/24/333/ccc/90x90.png?text=NoImage'"><div class="card-body"><div class="mkr">${it.maker}</div><div class="name">${it.name}</div><div class="prc">¥${last.price.toLocaleString()}</div></div>`;
@@ -150,7 +156,7 @@
             }
         }).catch(()=>stopScanner());
     }
-    function stopScanner() { if(scanner) scanner.stop(); document.getElementById('camera-area').style.display='none'; }
+    function stopScanner() { if(scanner) { scanner.stop().catch(()=>{}); } document.getElementById('camera-area').style.display='none'; }
     function openSettings() { document.getElementById('settingsModal').style.display='flex'; }
     function closeSettings() { 
         fbUrl = document.getElementById('firebase-url').value;
