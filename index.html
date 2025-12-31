@@ -1,439 +1,824 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#D50000">
-    <title>Smart Price v19.6</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
-        .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-        .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
-        .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
-        .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; }
-        .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
-        .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
-        .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
-        .store-tag.gps-btn.on { background: #ff5252; color: white; }
-        .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
-        .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
-        .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
-        .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
-        .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
-        .price-sub { font-size: 0.65rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; white-space: nowrap; }
-        .stats-strip { display: flex; flex-direction: column; background: #262626; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.75rem; border: 1px solid #333; }
-        .stats-row { display: flex; justify-content: space-around; width: 100%; }
-        .stat-item { text-align: center; flex: 1; color: #aaa; }
-        .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
-        .edit-notice { color: #5bc0de; text-align: center; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; }
-        .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
-        #interactive { width: 100%; height: 100%; }
-        .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
-        .laser { position: absolute; left: 5%; width: 90%; height: 2px; background: #ff0000; box-shadow: 0 0 10px 2px #ff0000; animation: scanning 2s infinite ease-in-out; z-index: 2002; }
-        @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
-        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
-        .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 4000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    </style>
-</head>
-<body>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#D50000">
+  <title>Smart Price v19.7-yui-01</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
+    .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
+    .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
+    .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; }
+    .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
+    .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
+    .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
+    .store-tag.gps-btn.on { background: #ff5252; color: white; }
+    .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
+    .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
+    .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
+    .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
+    .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
+    .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
+    .price-sub { font-size: 0.65rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; white-space: nowrap; }
+    .stats-strip { display: flex; flex-direction: column; background: #262626; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.75rem; border: 1px solid #333; }
+    .stats-row { display: flex; justify-content: space-around; width: 100%; }
+    .stat-item { text-align: center; flex: 1; color: #aaa; }
+    .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
+    .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
 
-<header class="header d-flex justify-content-between align-items-center">
-    <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.6</span></h5>
-    <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
+    @keyframes pulse-red {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(213, 0, 0, 0.7); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(213, 0, 0, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(213, 0, 0, 0); }
+    }
+    .pulse-target { animation: pulse-red 1.5s 2; }
+
+    #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
+    #interactive { width: 100%; height: 100%; }
+    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
+    .laser { position: absolute; left: 5%; width: 90%; height: 2px; background: #ff0000; box-shadow: 0 0 10px 2px #ff0000; animation: scanning 2s infinite ease-in-out; z-index: 2002; }
+    @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
+    .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
+    .toast-msg {
+      position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%);
+      background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px;
+      font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s;
+      pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+
+<!--
+  APP: Smart Price
+  VERSION: v19.7-yui-01
+  DATE(JST): 2026-01-01 00:46 JST
+  TITLE: GPS/スキャン/履歴遷移の現地不具合を優先修正（UI維持）
+  CHANGES:
+  - GPS: 履歴座標が無くても「生活圏（市）」中心座標で店を先頭に出す
+  - スキャン: stop待ちで詰まらないように「先にフォームを開く」+ 二重発火防止
+  - 履歴: グローバルエラー表示を強化（落ちた行番号がtoastで見える）
+  - カテゴリ: 欠損時の再注入を維持
+  - 使い方: 設定スイッチ/ヘッダ長押し/ボタンpulse（UI追加なし）
+  AUTHOR: Yui
+  BUILD_PARAM: ?b=2026-01-01_0046_yui-01
+  DEBUG_PARAM: &debug=1
+-->
+
+<header class="header d-flex justify-content-between align-items-center"
+  onmousedown="handleHeaderLongPressStart()" onmouseup="handleHeaderLongPressEnd()"
+  ontouchstart="handleHeaderLongPressStart()" ontouchend="handleHeaderLongPressEnd()">
+  <h5 class="m-0 fw-bold text-white">
+    <i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.7-yui-01</span>
+  </h5>
+  <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
 <div class="store-area"><div id="store-list" class="store-list"></div></div>
 
 <div class="container p-3">
-    <div id="mainView">
-        <div class="row g-2 mb-4">
-            <div class="col-7"><button id="scanBtnTop" class="btn btn-danger w-100 py-3 rounded-4 shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1"></i><br>スキャン</button></div>
-            <div class="col-5"><button class="btn btn-dark w-100 py-3 rounded-4 border-secondary shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i><br>手入力</button></div>
-        </div>
-        <div id="historyList"></div>
+  <div id="mainView">
+    <div class="row g-2 mb-4">
+      <div class="col-7">
+        <button id="scanBtnTop" class="btn btn-danger w-100 py-3 rounded-4 shadow" onclick="startScanner()">
+          <i class="bi bi-upc-scan fs-1"></i><br>スキャン
+        </button>
+      </div>
+      <div class="col-5">
+        <button id="manualBtnTop" class="btn btn-dark w-100 py-3 rounded-4 border-secondary shadow" onclick="showVeggieMenu()">
+          <i class="bi bi-keyboard fs-1"></i><br>手入力
+        </button>
+      </div>
     </div>
+    <div id="historyList"></div>
+  </div>
 
-    <div id="formView" style="display:none;">
-        <div class="card p-3 shadow-lg">
-            <div id="curStoreIndicator" class="text-danger small fw-bold mb-2 text-center" style="opacity:0.8;"></div>
-            <div id="formMainUI">
-                <div class="d-flex mb-3">
-                    <div style="position:relative; width:90px; height:90px; margin-right:12px;">
-                        <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;">
-                        <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
-                            <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
-                            <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
-                        </div>
-                        <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
-                    </div>
-                    <div class="flex-grow-1">
-                        <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
-                        <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
-                        <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
-                    </div>
-                </div>
-                <div id="priceSection" class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
-                    <div id="calcOptionArea" class="d-flex align-items-center mb-2">
-                        <div class="btn-group btn-group-sm w-100 me-2">
-                            <input type="radio" class="btn-check" name="taxMode" id="taxEx" value="ex" checked>
-                            <label class="btn btn-outline-danger" for="taxEx">税別</label>
-                            <input type="radio" class="btn-check" name="taxMode" id="taxIn" value="in">
-                            <label class="btn btn-outline-danger" for="taxIn">税込</label>
-                        </div>
-                        <div class="input-group input-group-sm w-50">
-                            <input type="number" id="inputDisc" class="form-control bg-dark text-white border-secondary" placeholder="0">
-                            <span class="input-group-text bg-dark text-secondary border-secondary">%引</span>
-                        </div>
-                    </div>
-                    <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0">
-                </div>
-                <div id="statsBox" class="stats-strip"></div>
-                <div id="detailHistory" class="mb-3" style="display:none;"></div>
-                <div class="text-center mb-3">
-                    <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleHistoryList()" id="toggleHistBtn">購入履歴を表示（タップで編集）</button>
-                </div>
-                <div class="d-flex gap-2 mb-3">
-                    <button id="delHistBtn" class="btn btn-outline-secondary py-3 fw-bold flex-grow-0 px-3 shadow" style="display:none;" onclick="confirmDeleteHist()">削除</button>
-                    <button id="saveBtn" class="btn btn-danger py-3 fw-bold fs-5 shadow flex-grow-1" onclick="saveData()">保存</button>
-                </div>
+  <div id="formView" style="display:none;">
+    <div class="card p-3 shadow-lg">
+      <div id="curStoreIndicator" class="text-danger small fw-bold mb-2 text-center" style="opacity:0.8;"></div>
+      <div id="formMainUI">
+        <div class="d-flex mb-3">
+          <div style="position:relative; width:90px; height:90px; margin-right:12px;">
+            <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;">
+            <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
+              <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
+              <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
             </div>
-            <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
+            <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
+          </div>
+          <div class="flex-grow-1">
+            <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
+            <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
+            <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
+          </div>
         </div>
+
+        <div id="priceSection" class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
+          <div id="calcOptionArea" class="d-flex align-items-center mb-2">
+            <div class="btn-group btn-group-sm w-100 me-2">
+              <input type="radio" class="btn-check" name="taxMode" id="taxEx" value="ex" checked>
+              <label class="btn btn-outline-danger" for="taxEx">税別</label>
+              <input type="radio" class="btn-check" name="taxMode" id="taxIn" value="in">
+              <label class="btn btn-outline-danger" for="taxIn">税込</label>
+            </div>
+            <div class="input-group input-group-sm w-50">
+              <input type="number" id="inputDisc" class="form-control bg-dark text-white border-secondary" placeholder="0">
+              <span class="input-group-text bg-dark text-secondary border-secondary">%引</span>
+            </div>
+          </div>
+          <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0">
+        </div>
+
+        <div id="statsBox" class="stats-strip"></div>
+        <div id="detailHistory" class="mb-3" style="display:none;"></div>
+
+        <div class="text-center mb-3">
+          <button class="btn btn-sm btn-outline-secondary w-100" onclick="toggleHistoryList()" id="toggleHistBtn">
+            購入履歴を表示（タップで編集）
+          </button>
+        </div>
+
+        <div class="d-flex gap-2 mb-3">
+          <button id="delHistBtn" class="btn btn-outline-secondary py-3 fw-bold flex-grow-0 px-3 shadow" style="display:none;" onclick="confirmDeleteHist()">削除</button>
+          <button id="saveBtn" class="btn btn-danger py-3 fw-bold fs-5 shadow flex-grow-1" onclick="saveData()">保存</button>
+        </div>
+      </div>
+
+      <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
     </div>
+  </div>
 </div>
 
 <div id="camera-area">
-    <div id="interactive"></div>
-    <div class="scan-frame"><div class="laser"></div></div>
-    <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-4 fs-3 shadow-lg">×</button>
+  <div id="interactive"></div>
+  <div class="scan-frame"><div class="laser"></div></div>
+  <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-4 fs-3 shadow-lg">×</button>
 </div>
 
 <div id="dialogModal" class="modal">
-    <div class="modal-content text-center">
-        <h6 id="dialogTitle" class="text-secondary mb-3">Smart Price</h6>
-        <p id="dialogMsg" class="text-white mb-4"></p>
-        <div id="dialogInputArea" style="display:none;"><input type="text" id="dialogInput" class="form-control bg-dark text-white mb-3"></div>
-        <div class="d-flex gap-2">
-            <button id="dialogCancel" class="btn btn-dark flex-grow-1" style="display:none;">やめる</button>
-            <button id="dialogOk" class="btn btn-danger flex-grow-1">OK</button>
-        </div>
+  <div class="modal-content text-center">
+    <h6 id="dialogTitle" class="text-secondary mb-3">Smart Price</h6>
+    <p id="dialogMsg" class="text-white mb-4"></p>
+    <div id="dialogInputArea" style="display:none;">
+      <input type="text" id="dialogInput" class="form-control bg-dark text-white mb-3">
     </div>
+    <div class="d-flex gap-2">
+      <button id="dialogCancel" class="btn btn-dark flex-grow-1" style="display:none;">やめる</button>
+      <button id="dialogOk" class="btn btn-danger flex-grow-1">OK</button>
+    </div>
+  </div>
 </div>
 
 <div id="settingsModal" class="modal">
-    <div class="modal-content">
-        <h5 class="text-white mb-4 text-center">設定</h5>
-        <div class="mb-3">
-            <label class="small text-secondary">生活圏（市）</label>
-            <input type="text" id="home-city-input" class="form-control bg-dark text-white border-secondary" placeholder="例：土浦市">
-        </div>
-        <div class="mb-3">
-            <label class="small text-secondary">Firebase URL</label>
-            <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary" placeholder="https://xxx.firebaseio.com/">
-        </div>
-        <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">設定保存と同期</button>
-        <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
+  <div class="modal-content">
+    <h5 class="text-white mb-4 text-center">設定</h5>
+
+    <div class="mb-3">
+      <label class="small text-secondary">生活圏（市）</label>
+      <input type="text" id="home-city-input" class="form-control bg-dark text-white border-secondary" placeholder="例：土浦市">
     </div>
+
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+      <label class="small text-secondary">使い方アシスタント</label>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" id="assistant-switch">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="small text-secondary">Firebase URL</label>
+      <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary" placeholder="https://xxx.firebaseio.com/">
+    </div>
+
+    <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">設定保存と同期</button>
+    <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
+  </div>
 </div>
 
 <div id="toast" class="toast-msg"></div>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    /* Build Engine: v19.6 (Restored Scanner Integration) */
-    const CITY_STORE_PRESET = {
-        "土浦市": ["カスミ土浦駅前店", "カスミ ピアシティ荒川本郷店", "ヨークベニマル", "タイヨー", "まるも", "ウエルシア"],
-        "つくば市": ["カスミ つくば竹園店", "ヨークベニマル つくば竹園店", "ロピア つくば店", "タイヨー", "ウエルシア"],
-        "東海村": ["カスミ東海店", "ヨークベニマル東海店", "イオン東海店"]
+  // ---- グローバルエラー捕捉（落ちた瞬間に原因行が見える） ----
+  window.onerror = (msg, url, line, col) => { showToast(`⚠️ERR: ${msg} (L${line}:${col||0})`); return false; };
+  window.onunhandledrejection = (event) => { showToast(`⚠️PROMISE_ERR: ${event.reason}`); };
+
+  // ---- 生活圏プリセット（中心座標で“今いる市”を推定） ----
+  const CITY_STORE_PRESET = {
+    "土浦市": { stores: ["カスミ土浦駅前店", "まるも", "ウエルシア"], lat: 36.078, lng: 140.200 },
+    "つくば市": { stores: ["ロピア つくば店", "タイヨー"], lat: 36.083, lng: 140.111 },
+    "東海村": { stores: ["カスミ東海店", "イオン東海店"], lat: 36.463, lng: 140.606 }
+  };
+
+  let db = { products: {}, config: { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "", assistant: true } };
+  let curBarcode = null, curStore = "未設定", tempImgData = null;
+  let scanner = null, isScanning = false, scannedLock = false;
+  let editingHistIdx = null;
+
+  let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || '';
+  let isGpsOn = false, curPos = null, lastGpsTime = "";
+  let headerTimer = null;
+
+  window.onload = () => {
+    loadLocal();
+    initCategorySelect();
+    renderStoreList();
+    renderHistory();
+    if (fbUrl) syncFirebase();
+    setupFocusGuides();
+    checkAssistant("main");
+  };
+
+  function loadLocal() {
+    const saved = localStorage.getItem('smart_price_db');
+    if (saved) db = JSON.parse(saved);
+    if (!db.products) db.products = {};
+    if (!db.config) db.config = { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "", assistant: true };
+
+    // カテゴリ欠損の再注入
+    if (!db.config.categories || db.config.categories.length === 0) db.config.categories = ["飲料","食品","日用品","薬","その他"];
+    if (db.config.assistant === undefined) db.config.assistant = true;
+
+    document.getElementById('assistant-switch').checked = !!db.config.assistant;
+    document.getElementById(db.config.lastTax === "in" ? 'taxIn' : 'taxEx').checked = true;
+  }
+
+  function saveLocalOnly() { localStorage.setItem('smart_price_db', JSON.stringify(db)); }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.opacity = 1;
+    setTimeout(() => { t.style.opacity = 0; }, 3200);
+  }
+
+  function checkAssistant(view) {
+    if (!db.config.assistant) return;
+    if (view === "main") {
+      setTimeout(() => {
+        showToast("💡店名を選んでからスキャンすると迷いません");
+        const btn = document.getElementById('scanBtnTop');
+        btn.classList.add('pulse-target');
+        setTimeout(() => btn.classList.remove('pulse-target'), 3000);
+      }, 900);
+    }
+  }
+
+  function handleHeaderLongPressStart() {
+    headerTimer = setTimeout(() => {
+      if (!db.config.assistant) return;
+      showToast("💡手順：店名選択 → スキャン → 価格入力 → 保存");
+    }, 900);
+  }
+  function handleHeaderLongPressEnd() { clearTimeout(headerTimer); }
+
+  function initCategorySelect() {
+    const sel = document.getElementById('inputCategory');
+    let optionsHtml = `<option value="__NONE__">カテゴリを選ぶ</option>`;
+    optionsHtml += db.config.categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    optionsHtml += `<option value="ADD">+ カテゴリを追加</option>`;
+    sel.innerHTML = optionsHtml;
+
+    sel.onchange = async () => {
+      if (sel.value === "ADD") {
+        const n = await customPrompt("新しいカテゴリ名を入力");
+        if (n) { db.config.categories.push(n); saveLocalOnly(); initCategorySelect(); sel.value = n; }
+        else { sel.selectedIndex = 0; sel.value="__NONE__"; }
+      }
     };
+  }
 
-    let db = { products: {}, config: { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "" } };
-    let curBarcode = null, curStore = "未設定", tempImgData = null, scanner = null, editingHistIdx = null, isScanning = false;
-    let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || '';
-    let isGpsOn = false, curPos = null, lastGpsTime = "", wasWrapped = false;
+  // ---- 距離（km） ----
+  function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2-lat1)*Math.PI/180;
+    const dLon = (lon2-lon1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
 
-    window.onload = () => { loadLocal(); initCategorySelect(); renderStoreList(); renderHistory(); if(fbUrl) syncFirebase(); setupFocusGuides(); };
+  // ---- GPS（履歴が無くても“市”の店が前に出る） ----
+  function toggleGps() {
+    if (!isGpsOn) {
+      isGpsOn = true;
+      lastGpsTime = "…";
+      renderStoreList();
+      showToast("GPS取得中…");
 
-    function loadLocal() { 
-        const saved = localStorage.getItem('smart_price_db'); 
-        if (saved) db = JSON.parse(saved); 
-        if (!db.products) db.products = {}; 
-        if (!db.config) db.config = { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "" };
-        if (db.config.homeCity === undefined) db.config.homeCity = "";
-        document.getElementById(db.config.lastTax === "in" ? 'taxIn' : 'taxEx').checked = true;
+      if (!navigator.geolocation) {
+        showToast("⚠️この端末はGPS非対応です");
+        isGpsOn = false; renderStoreList();
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition((pos) => {
+        curPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        const d = new Date();
+        lastGpsTime = `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
+        showToast(`📍GPS: ${curPos.lat.toFixed(3)},${curPos.lng.toFixed(3)}`);
+        renderStoreList();
+      }, (err) => {
+        showToast(`GPSエラー(${err.code}): ${err.message}`);
+        isGpsOn = false; curPos = null; lastGpsTime = "";
+        renderStoreList();
+      }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+
+    } else {
+      isGpsOn = false; curPos = null; lastGpsTime = "";
+      renderStoreList();
+      showToast("GPS OFF");
     }
+  }
 
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerText = msg; t.style.opacity = 1;
-        setTimeout(() => { t.style.opacity = 0; }, 2800);
+  function resolveNearestCityByPos() {
+    if (!curPos) return null;
+    let best = null;
+    Object.keys(CITY_STORE_PRESET).forEach(city => {
+      const c = CITY_STORE_PRESET[city];
+      if (!c || c.lat == null) return;
+      const dist = getDistance(curPos.lat, curPos.lng, c.lat, c.lng);
+      if (best == null || dist < best.dist) best = { city, dist };
+    });
+    // 半径 25km 以内なら「その市に居る」扱い（緩め）
+    if (best && best.dist <= 25) return best.city;
+    return null;
+  }
+
+  function renderStoreList(manualPriority = []) {
+    const list = document.getElementById('store-list');
+
+    // 履歴ベース（GPS ON & 履歴にlat/lngがある場合）
+    const nearHistoryStores = new Set();
+    const freqHistoryStores = {};
+
+    Object.values(db.products).forEach(p => p.history?.forEach(h => {
+      if (!h.store || h.store === "未設定") return;
+
+      if (isGpsOn && curPos && h.lat && h.lng) {
+        if (getDistance(curPos.lat, curPos.lng, h.lat, h.lng) <= 2.0) nearHistoryStores.add(h.store);
+      }
+      freqHistoryStores[h.store] = (freqHistoryStores[h.store] || 0) + 1;
+    }));
+
+    const sortedFreq = Object.keys(freqHistoryStores).sort((a,b) => freqHistoryStores[b] - freqHistoryStores[a]);
+
+    // ★ここが重要：履歴が無くても“市”を推定して店を前へ
+    const cityByGps = (isGpsOn && curPos) ? resolveNearestCityByPos() : null;
+    const homeCity = db.config.homeCity || "";
+    const cityKey = cityByGps || homeCity;
+    const cityData = CITY_STORE_PRESET[cityKey] || { stores: [] };
+
+    const defaults = homeCity ? [] : ["イオン", "業務スーパー", "クリエイト", "スギ薬局", "マツキヨ"];
+
+    const finalSet = ["未設定", ...new Set([
+      ...manualPriority,
+      ...(cityData.stores || []),
+      ...Array.from(nearHistoryStores),
+      ...sortedFreq,
+      ...defaults
+    ])];
+
+    const gpsTxt = isGpsOn ? `GPS<span class="gps-status">●${lastGpsTime}</span>` : `GPS<span class="gps-status">OFF</span>`;
+    list.innerHTML = `<span class="store-tag gps-btn ${isGpsOn?'on':''}" onclick="toggleGps()">${gpsTxt}</span>`;
+
+    finalSet.forEach(name => {
+      const span = document.createElement('span');
+      span.className = 'store-tag' + (name === curStore ? ' active' : '');
+      span.innerText = name;
+
+      span.onclick = () => {
+        document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
+        span.classList.add('active');
+        curStore = name;
+        const ind = document.getElementById('curStoreIndicator');
+        if (ind) ind.innerText = `【 ${curStore} 】で保存します`;
+      };
+
+      list.appendChild(span);
+    });
+  }
+
+  // ---- スキャナ（止め待ちで詰まらない：フォーム先出し + 二重発火ロック） ----
+  function startScanner() {
+    if (isScanning) return;
+    isScanning = true;
+    scannedLock = false;
+
+    document.getElementById('camera-area').style.display='block';
+    showToast("カメラ起動中…");
+
+    if (!scanner) scanner = new Html5Qrcode("interactive");
+
+    scanner.start(
+      { facingMode:"environment" },
+      { fps: 15, qrbox: { width: 280, height: 180 } },
+      (t) => {
+        if (scannedLock) return;
+        scannedLock = true;
+
+        showToast("読み取りOK");
+        // ★ 先にフォームを開く（stop待ちで詰まらせない）
+        openForm(t);
+        // ★ 停止は裏で（失敗してもUIは止めない）
+        stopScanner(true);
+      }
+    ).catch(() => {
+      showToast("起動失敗");
+      stopScanner(false);
+    });
+  }
+
+  async function stopScanner(silent) {
+    try {
+      if (scanner) {
+        await scanner.stop();
+      }
+    } catch(e) {
+      if (!silent) showToast("停止エラー（再試行OK）");
+    } finally {
+      document.getElementById('camera-area').style.display='none';
+      isScanning = false;
     }
+  }
 
-    function setupFocusGuides() {
-        const guides = { 'inputName': "例：コカ・コーラ 500ml", 'inputMaker': "例：メーカー名（任意）", 'inputPrice': "価格を入力して保存" };
-        Object.keys(guides).forEach(id => { document.getElementById(id).addEventListener('focus', () => showToast(guides[id])); });
-    }
+  async function openForm(code) {
+    try {
+      curBarcode = code;
+      editingHistIdx = null;
 
-    function initCategorySelect() {
-        const sel = document.getElementById('inputCategory');
-        let optionsHtml = `<option value="__NONE__">カテゴリを選ぶ</option>`;
-        optionsHtml += db.config.categories.map(c => `<option value="${c}">${c}</option>`).join('');
-        optionsHtml += `<option value="ADD">+ カテゴリを追加</option>`;
-        sel.innerHTML = optionsHtml;
-        sel.onchange = async () => { 
-            if(sel.value === "ADD") { 
-                const n = await customPrompt("新しいカテゴリ名を入力"); 
-                if(n) { db.config.categories.push(n); initCategorySelect(); sel.value = n; } else { sel.selectedIndex = 0; } 
-            } 
-        };
-    }
+      const p = db.products[code];
+      const exists = !!p;
 
-    function normalizeImageSrc(raw) {
-      if (!raw) return "";
-      let src = raw;
-      if (typeof src !== "string") return "";
-      if (src.length > 100 && !src.includes(":") && !src.startsWith("data:image/")) src = "data:image/jpeg;base64," + src;
-      if (src.startsWith("http://")) src = src.replace("http://", "https://");
-      return (src.startsWith("data:image/") || src.startsWith("https://")) ? src : "";
-    }
+      initCategorySelect();
+      const catSelect = document.getElementById('inputCategory');
 
-    /* openForm: v19.5e Enhanced Anti-Cache Category Reset */
-    async function openForm(code) {
-        curBarcode = code; editingHistIdx = null;
-        const p = db.products[code];
-        const exists = !!p;
+      document.getElementById('mainView').style.display='none';
+      document.getElementById('formView').style.display='block';
 
-        initCategorySelect();
-        let catSelect = document.getElementById('inputCategory');
-        
-        document.getElementById('mainView').style.display='none';
-        document.getElementById('formView').style.display='block';
-        document.getElementById('curStoreIndicator').innerText = `【 ${curStore} 】で保存します`;
+      document.getElementById('curStoreIndicator').innerText = `【 ${curStore} 】で保存します`;
 
-        document.getElementById('inputPrice').value = "";
-        document.getElementById('inputDisc').value = "";
-        document.getElementById('saveBtn').innerText = "保存";
-        document.getElementById('delHistBtn').style.display = "none";
-        document.getElementById('calcOptionArea').style.display = "flex";
+      document.getElementById('inputPrice').value = "";
+      document.getElementById('inputDisc').value = "";
+      document.getElementById('saveBtn').innerText = "保存";
+      document.getElementById('delHistBtn').style.display = "none";
+      document.getElementById('calcOptionArea').style.display = "flex";
 
-        if (!exists) {
-            showToast("入力順：①商品名 ②カテゴリ ③メーカー(任意) ④価格");
-            document.getElementById('inputName').value = "";
-            document.getElementById('inputMaker').value = "";
-            
-            catSelect.value = "__NONE__";
-            catSelect.selectedIndex = 0;
-            catSelect.dispatchEvent(new Event("change", { bubbles:true }));
-            requestAnimationFrame(()=>{ catSelect.value="__NONE__"; catSelect.selectedIndex=0; });
+      if (!exists) {
+        showToast("新規：商品名→カテゴリ→価格の順でOK");
+        document.getElementById('inputName').value = "";
+        document.getElementById('inputMaker').value = "";
+        catSelect.value = "__NONE__";
+        catSelect.selectedIndex = 0;
 
-            document.getElementById('previewImg').src = "https://placehold.jp/24/333/ccc/68x68.png?text=NoImage";
-            tempImgData = null;
+        document.getElementById('previewImg').src = "https://placehold.jp/24/333/ccc/68x68.png?text=NoImage";
+        tempImgData = null;
 
-            if (window.google && google.script) {
-              google.script.run.withSuccessHandler((data)=>{
-                if (data && !data.error) {
-                  document.getElementById('inputName').value = data.name;
-                  document.getElementById('inputMaker').value = data.maker;
-                  if (data.imageUrl) document.getElementById('previewImg').src = data.imageUrl;
-                  tempImgData = data.imageUrl;
-                  showToast("商品情報を自動入力しました");
-                }
-              }).lookupYahooByJan(code);
+        if (window.google && google.script) {
+          google.script.run.withSuccessHandler((data) => {
+            if (data && !data.error) {
+              document.getElementById('inputName').value = data.name || "";
+              document.getElementById('inputMaker').value = data.maker || "";
+              if (data.imageUrl) document.getElementById('previewImg').src = data.imageUrl;
+              tempImgData = data.imageUrl || null;
+              showToast("商品情報を自動入力しました");
             }
-        } else {
-            showToast("価格を入れて保存（履歴は下で編集）");
-            document.getElementById('inputName').value = p.name || "";
-            document.getElementById('inputMaker').value = p.maker || "";
-            
-            const catVal = p.category || "__NONE__";
-            const hasOption = [...catSelect.options].some(o => o.value === catVal);
-            const targetVal = hasOption ? catVal : "__NONE__";
-            
-            catSelect.value = targetVal;
-            requestAnimationFrame(()=>{ catSelect.value = targetVal; });
-
-            const src = normalizeImageSrc(p.image || p.imageUrl || p.imageData || "");
-            document.getElementById('previewImg').src = src || "https://placehold.jp/24/333/ccc/68x68.png?text=NoImage";
-            tempImgData = src;
+          }).lookupYahooByJan(code);
         }
-        renderStats(exists ? p.history : []);
-        renderDetailHistory(exists ? p.history : []);
+      } else {
+        showToast("登録済み：価格を入れて保存（履歴は下で編集）");
+        document.getElementById('inputName').value = p.name || "";
+        document.getElementById('inputMaker').value = p.maker || "";
+
+        const catVal = p.category || "__NONE__";
+        const hasOption = [...catSelect.options].some(o => o.value === catVal);
+        catSelect.value = hasOption ? catVal : "__NONE__";
+
+        const raw = p.image || p.imageUrl || p.imageData || "";
+        let src = (typeof raw === 'string' && (raw.startsWith('data:') || raw.startsWith('http'))) ? raw : "";
+        if (src.startsWith("http://")) src = src.replace("http://", "https://");
+        document.getElementById('previewImg').src = src || "https://placehold.jp/24/333/ccc/68x68.png?text=NoImage";
+        tempImgData = src || null;
+      }
+
+      renderStats(exists ? p.history : []);
+      renderDetailHistory(exists ? p.history : []);
+    } catch (e) {
+      showToast("⚠️FormError: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  function renderDetailHistory(history) {
+    const div = document.getElementById('detailHistory');
+    div.innerHTML = "";
+    if (!history) return;
+
+    [...history].reverse().forEach((h, idx) => {
+      const row = document.createElement('div');
+      row.className = "history-row";
+
+      const actIdx = history.length - 1 - idx;
+      row.onclick = () => editHistoryMode(actIdx);
+
+      const dateStr = h.ts ? new Date(h.ts).toLocaleDateString() : "(日付不明)";
+      row.innerHTML =
+        `<div class="flex-grow-1">
+          <span class="text-secondary small">${dateStr}</span><br>
+          <span class="text-white fw-bold">${h.store || '未設定'}</span>
+        </div>
+        <div class="text-end">
+          <span class="fw-bold text-white">${h.price}円</span><br>
+          <span class="text-info small"><i class="bi bi-pencil-square"></i> タップで編集</span>
+        </div>`;
+
+      div.appendChild(row);
+    });
+  }
+
+  function editHistoryMode(idx) {
+    try {
+      editingHistIdx = idx;
+      const h = db.products[curBarcode].history[idx];
+
+      document.getElementById('inputPrice').value = h.price;
+      document.getElementById('inputDisc').value = 0;
+      document.getElementById('taxIn').checked = true;
+
+      curStore = h.store || "未設定";
+      renderStoreList();
+
+      document.getElementById('calcOptionArea').style.display = "none";
+      document.getElementById('saveBtn').innerText = "変更を確定";
+      document.getElementById('delHistBtn').style.display = "block";
+      document.getElementById('curStoreIndicator').innerText = `【 ${curStore} 】の履歴を編集中`;
+
+      showToast("履歴を編集中：保存で確定");
+      document.getElementById('priceSection').scrollIntoView({behavior: 'smooth'});
+    } catch (e) {
+      showToast("⚠️EditError: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  async function showVeggieMenu() {
+    const v = await customPrompt("商品名称（またはメモ）を入力");
+    if (v && v.trim()) openForm("M_" + v.trim());
+  }
+
+  function renderStats(history) {
+    const box = document.getElementById('statsBox');
+    if (!history || history.length === 0) { box.innerHTML = "過去データなし"; return; }
+    const pArr = history.map(h => h.price);
+    const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
+    const low = Math.min(...pArr);
+    const last = pArr[pArr.length-1];
+
+    box.innerHTML =
+      `<div class="stats-row">
+        <div class="stat-item">平均<span class="stat-val">${avg}円</span></div>
+        <div class="stat-item">最安<span class="stat-val text-danger">${low}円</span></div>
+        <div class="stat-item">前回<span class="stat-val">${last}円</span></div>
+      </div>`;
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = "";
+
+    const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
+    items.sort((a,b) => (b.history?.[b.history.length-1]?.ts || 0) - (a.history?.[a.history.length-1]?.ts || 0));
+
+    items.forEach(it => {
+      if (!it.history?.length) return;
+
+      const pArr = it.history.map(h => h.price);
+      const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
+      const low = Math.min(...pArr);
+      const last = it.history[it.history.length-1];
+
+      const div = document.createElement('div');
+      div.className = `card price-card ${last.price <= avg ? 'cheap' : ''}`;
+      div.onclick = () => openForm(it.code);
+
+      const raw = it.image || it.imageUrl || it.imageData || "";
+      let src = (typeof raw === 'string' && (raw.startsWith('data:') || raw.startsWith('http'))) ? raw : "";
+      if (src.startsWith("http://")) src = src.replace("http://", "https://");
+
+      div.innerHTML =
+        `<div class="d-flex align-items-center">
+          <img src="${src || 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage'}" class="prod-thumb">
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-bold text-white small text-truncate">${it.name || '(商品名なし)'}</div>
+            <div class="text-secondary" style="font-size:0.6rem;">${last.store || '未設定'} / 平均 ${avg}円</div>
+          </div>
+          <div class="text-end ms-2">
+            <div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div>
+            <div class="price-sub">最安 ${low}円 / 前回 ${last.price}円</div>
+          </div>
+        </div>`;
+
+      list.appendChild(div);
+    });
+  }
+
+  async function saveData() {
+    if (curStore === "未設定") { showToast("店名を選んでください"); return; }
+    const catVal = document.getElementById('inputCategory').value;
+    if (catVal === "__NONE__") { showToast("カテゴリを選んでね"); return; }
+
+    if (!db.products[curBarcode]) db.products[curBarcode] = { history: [] };
+    const p = db.products[curBarcode];
+
+    p.name = document.getElementById('inputName').value || "商品名なし";
+    p.maker = document.getElementById('inputMaker').value || "";
+    p.category = catVal;
+    if (tempImgData) p.image = tempImgData;
+
+    const rawP = Number(document.getElementById('inputPrice').value);
+
+    if (editingHistIdx !== null) {
+      if (!(rawP > 0)) { showToast("価格を入力してください"); return; }
+      p.history[editingHistIdx].price = rawP;
+      p.history[editingHistIdx].store = curStore;
+
+      saveLocalOnly();
+      if (fbUrl) syncFirebasePut();
+      showToast("変更しました");
+      openForm(curBarcode);
+      return;
     }
 
-    /** * CRITICAL FIX for Scanner 
-     */
-    function startScanner() {
-        if(isScanning) return; isScanning = true;
-        document.getElementById('camera-area').style.display='block'; showToast("カメラ起動中…");
-        if(!scanner) scanner = new Html5Qrcode("interactive");
-        scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:180}},(t)=>{ 
-            showToast("読み取りOK"); 
-            stopScanner(); 
-            openForm(t); // ★ここでフォームを開くように修正しました
-        }).then(() => { showToast("バーコードを枠内へ"); }).catch(() => { showToast("起動失敗"); stopScanner(); });
+    if (!(rawP > 0)) { showToast("価格を入力してください"); return; }
+
+    const disc = Number(document.getElementById('inputDisc').value || 0);
+    let finalP = Math.floor(rawP * (1 - disc/100));
+    if (document.getElementById('taxEx').checked) finalP = Math.floor(finalP * 1.08);
+    db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
+
+    const entry = { price: finalP, store: curStore, ts: Date.now() };
+    if (curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
+    p.history.push(entry);
+
+    saveLocalOnly();
+    if (fbUrl) syncFirebasePut();
+    showToast("保存完了");
+    showHome();
+  }
+
+  function showHome() {
+    document.getElementById('mainView').style.display='block';
+    document.getElementById('formView').style.display='none';
+    renderHistory();
+    renderStoreList();
+    checkAssistant("main");
+  }
+
+  function handleImage(input) {
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        tempImgData = e.target.result;
+        document.getElementById('previewImg').src = e.target.result;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+  }
+
+  function openSettings() {
+    document.getElementById('settingsModal').style.display='flex';
+    document.getElementById('fb-url-input').value = fbUrl;
+    document.getElementById('home-city-input').value = db.config.homeCity || "";
+    document.getElementById('assistant-switch').checked = !!db.config.assistant;
+  }
+  function closeSettings() { document.getElementById('settingsModal').style.display='none'; }
+
+  async function startMigration() {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true; btn.innerText = "同期中…";
+
+    db.config.homeCity = document.getElementById('home-city-input').value.trim();
+    db.config.assistant = document.getElementById('assistant-switch').checked;
+    saveLocalOnly();
+
+    const u = document.getElementById('fb-url-input').value.trim();
+    if (!u) {
+      showToast("設定保存しました");
+      btn.disabled = false; btn.innerText = "設定保存と同期";
+      closeSettings(); renderStoreList();
+      return;
     }
 
-    async function showVeggieMenu() { 
-        const v = await customPrompt("商品コードまたは名称を入力"); 
-        if(v && v.trim() !== "") { openForm("M_"+v.trim()); }
+    try {
+      const base = u.replace(/\/$/, "");
+      const res = await fetch(base + "/smart_price.json", { method: 'PUT', body: JSON.stringify(db) });
+      if (res.ok) {
+        fbUrl = u;
+        localStorage.setItem('smartPriceFirebaseUrl', u);
+        showToast("同期成功！再読込します");
+        setTimeout(() => location.reload(), 800);
+      } else {
+        throw new Error("HTTP " + res.status);
+      }
+    } catch(e) {
+      showToast("同期失敗：URLを確認してください");
+      btn.disabled = false; btn.innerText = "設定保存と同期";
     }
+  }
 
-    function showHome() { 
-        document.getElementById('mainView').style.display='block'; 
-        document.getElementById('formView').style.display='none'; 
-        initCategorySelect();
-        const cs = document.getElementById("inputCategory");
-        if(cs) { cs.value="__NONE__"; cs.selectedIndex=0; }
-        renderHistory(); renderStoreList(); 
-    }
+  function toggleHistoryList() {
+    const div = document.getElementById('detailHistory');
+    const btn = document.getElementById('toggleHistBtn');
+    const isHidden = (div.style.display === 'none');
+    div.style.display = isHidden ? 'block' : 'none';
+    btn.innerText = isHidden ? "購入履歴を隠す" : "購入履歴を表示（タップで編集）";
+  }
 
-    /* System Modules */
-    function toggleGps() {
-        if(!isGpsOn) {
-            isGpsOn = true; lastGpsTime = "…"; renderStoreList(); showToast("GPS取得中…");
-            navigator.geolocation.getCurrentPosition((pos) => {
-                curPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                const d = new Date(); lastGpsTime = `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-                renderStoreList(); showToast("GPS ON");
-            }, (err) => { showToast(`GPSエラー(${err.code}): ${err.message}`); isGpsOn = false; renderStoreList(); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-        } else { isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); showToast("GPS OFF"); }
-    }
+  async function confirmDeleteHist() {
+    if (editingHistIdx === null) return;
+    const ok = await customConfirm("履歴を整理（除外）しますか？", "OK", "やめる");
+    if (!ok) return;
+    db.products[curBarcode].history.splice(editingHistIdx, 1);
+    saveLocalOnly();
+    if (fbUrl) syncFirebasePut();
+    showToast("整理しました");
+    openForm(curBarcode);
+  }
 
-    function renderStoreList(manualPriority = []) {
-        const list = document.getElementById('store-list');
-        const nearHistoryStores = new Set();
-        let freqHistoryStores = {};
-        Object.values(db.products).forEach(p => p.history?.forEach(h => {
-            if(!h.store || h.store === "未設定") return;
-            if(isGpsOn && curPos && h.lat && h.lng) {
-                const R = 6371; const dLat = (h.lat-curPos.lat)*Math.PI/180; const dLon = (h.lng-curPos.lng)*Math.PI/180;
-                const a = Math.sin(dLat/2)**2 + Math.cos(curPos.lat*Math.PI/180)*Math.cos(h.lat*Math.PI/180)*Math.sin(dLon/2)**2;
-                if(R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= 0.1) nearHistoryStores.add(h.store);
-            }
-            freqHistoryStores[h.store] = (freqHistoryStores[h.store] || 0) + 1;
-        }));
-        const sortedFreq = Object.keys(freqHistoryStores).sort((a,b) => freqHistoryStores[b] - freqHistoryStores[a]);
-        const cityStores = CITY_STORE_PRESET[db.config.homeCity] || [];
-        const defaults = db.config.homeCity ? [] : ["イオン", "業務スーパー", "クリエイト", "スギ薬局", "マツキヨ"];
-        const finalSet = ["未設定", ...new Set([...manualPriority, ...Array.from(nearHistoryStores), ...cityStores, ...sortedFreq, ...defaults])];
-        const gpsTxt = isGpsOn ? `GPS<span class="gps-status">●${lastGpsTime}</span>` : `GPS<span class="gps-status">OFF</span>`;
-        list.innerHTML = `<span class="store-tag gps-btn ${isGpsOn?'on':''}" onclick="toggleGps()">${gpsTxt}</span>`;
-        finalSet.forEach(name => {
-            const span = document.createElement('span');
-            span.className = 'store-tag' + (name === curStore ? ' active' : '');
-            span.innerText = name;
-            span.onclick = () => { 
-                document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active')); 
-                span.classList.add('active'); curStore = name;
-                document.getElementById('curStoreIndicator').innerText = `【 ${curStore} 】で保存します`;
-            };
-            list.appendChild(span);
-        });
-    }
+  function searchImageWeb() {
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(document.getElementById('inputName').value)}+商品画像&tbm=isch`, '_blank');
+  }
 
-    async function saveData() {
-        if (curStore === "未設定") { showToast("店名を選んでください"); return; }
-        const catVal = document.getElementById('inputCategory').value;
-        if (catVal === "__NONE__") { showToast("カテゴリを選んでね"); return; }
+  function customPrompt(msg, def = "") {
+    return new Promise(res => {
+      document.getElementById('dialogMsg').innerText = msg;
+      const iArea = document.getElementById('dialogInputArea');
+      iArea.style.display = "block";
+      const i = document.getElementById('dialogInput');
+      i.value = def;
+      document.getElementById('dialogCancel').style.display = "block";
+      document.getElementById('dialogModal').style.display = "flex";
+      document.getElementById('dialogOk').onclick = () => {
+        iArea.style.display="none";
+        document.getElementById('dialogModal').style.display="none";
+        res(i.value);
+      };
+      document.getElementById('dialogCancel').onclick = () => {
+        iArea.style.display="none";
+        document.getElementById('dialogModal').style.display="none";
+        res(null);
+      };
+    });
+  }
 
-        if (!db.products[curBarcode]) db.products[curBarcode] = { history: [] };
-        const p = db.products[curBarcode];
-        p.name = document.getElementById('inputName').value || "商品名なし";
-        p.maker = document.getElementById('inputMaker').value || "";
-        p.category = catVal;
-        if (tempImgData) p.image = tempImgData;
-        const rawP = Number(document.getElementById('inputPrice').value);
-        if (editingHistIdx !== null) {
-            if(!(rawP > 0)) { showToast("価格を入力してください"); return; }
-            p.history[editingHistIdx].price = rawP; p.history[editingHistIdx].store = curStore;
-            saveLocalOnly(); if(fbUrl) syncFirebasePut(); showToast("変更しました"); openForm(curBarcode);
-        } else if (rawP > 0) {
-            const disc = Number(document.getElementById('inputDisc').value || 0);
-            let finalP = Math.floor(rawP * (1 - disc/100));
-            if(document.getElementById('taxEx').checked) finalP = Math.floor(finalP * 1.08);
-            db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
-            const entry = { price: finalP, store: curStore, ts: Date.now() };
-            if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
-            p.history.push(entry);
-            saveLocalOnly(); if(fbUrl) syncFirebasePut(); showToast("保存完了"); showHome();
-        } else { showToast("価格を入力してください"); }
-    }
+  function customConfirm(msg, ok="OK", cancel="やめる") {
+    return new Promise(res => {
+      document.getElementById('dialogMsg').innerText = msg;
+      const c = document.getElementById('dialogCancel');
+      c.style.display = "block";
+      c.innerText = cancel;
+      const o = document.getElementById('dialogOk');
+      o.innerText = ok;
+      document.getElementById('dialogModal').style.display = "flex";
+      o.onclick = () => { document.getElementById('dialogModal').style.display = "none"; res(true); };
+      c.onclick = () => { document.getElementById('dialogModal').style.display = "none"; res(false); };
+    });
+  }
 
-    function stopScanner() { if(scanner) scanner.stop().finally(()=>{ document.getElementById('camera-area').style.display='none'; isScanning = false; }); else { document.getElementById('camera-area').style.display='none'; isScanning = false; } }
-    async function startMigration() { 
-        const btn = document.getElementById('syncBtn'); const u = document.getElementById('fb-url-input').value.trim(); 
-        db.config.homeCity = document.getElementById('home-city-input').value.trim(); showToast("保存中…");
-        btn.disabled = true; btn.innerText = "同期中…"; saveLocalOnly();
-        if(!u) { showToast("設定保存しました"); btn.disabled = false; btn.innerText = "設定保存と同期"; closeSettings(); renderStoreList(); return; }
-        try { const res = await fetch(getSafeUrl(u), { method: 'PUT', body: JSON.stringify(wasWrapped ? {db:db}:db) }); if(res.ok) { fbUrl = u; localStorage.setItem('smartPriceFirebaseUrl', u); showToast("完了"); setTimeout(() => location.reload(), 600); } else { throw new Error(); } } catch(e){ showToast("同期失敗"); btn.disabled = false; btn.innerText = "設定保存と同期"; }
-    }
-    function renderDetailHistory(history) {
-        const div = document.getElementById('detailHistory'); div.innerHTML = "";
-        [...history].reverse().forEach((h, idx) => {
-            const row = document.createElement('div'); row.className = "history-row";
-            const actIdx = history.length - 1 - idx;
-            row.onclick = () => editHistoryMode(actIdx);
-            const dateStr = h.ts ? new Date(h.ts).toLocaleDateString() : "(日付不明)";
-            row.innerHTML = `<div class="flex-grow-1"><span class="text-secondary small">${dateStr}</span><br><span class="text-white fw-bold">${h.store || '未設定'}</span></div><div class="text-end"><span class="fw-bold text-white">${h.price}円</span><br><span class="text-info small"><i class="bi bi-pencil-square"></i> タップで編集</span></div>`;
-            div.appendChild(row);
-        });
-    }
-    function editHistoryMode(idx) {
-        editingHistIdx = idx; const h = db.products[curBarcode].history[idx];
-        if (navigator.vibrate) navigator.vibrate(20);
-        document.getElementById('inputPrice').value = h.price; document.getElementById('inputDisc').value = 0; document.getElementById('taxIn').checked = true;
-        curStore = h.store || "未設定"; renderStoreList();
-        document.getElementById('calcOptionArea').style.display = "none";
-        document.getElementById('saveBtn').innerText = "変更を確定"; document.getElementById('delHistBtn').style.display = "block";
-        document.getElementById('curStoreIndicator').innerText = `【 ${curStore} 】の履歴を編集中`;
-        showToast("履歴を編集中：保存で確定");
-        document.getElementById('priceSection').scrollIntoView({behavior: 'smooth'});
-        setTimeout(() => document.getElementById('inputPrice').focus(), 500);
-    }
-    function renderStats(history, editingInfo = null) {
-        const box = document.getElementById('statsBox');
-        if (!history || history.length === 0) { box.innerHTML = "過去データなし"; return; }
-        const pArr = history.map(h => h.price); const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
-        const low = Math.min(...pArr); const last = pArr[pArr.length-1];
-        let html = ""; if(editingInfo) html += `<div class="edit-notice">${editingInfo} を編集中</div>`;
-        html += `<div class="stats-row"><div class="stat-item">平均購入<span class="stat-val">${avg}円</span></div><div class="stat-item">最安値<span class="stat-val text-danger">${low}円</span></div><div class="stat-item">前回価格<span class="stat-val">${last}円</span></div></div>`;
-        box.innerHTML = html;
-    }
-    function renderHistory() {
-        const list = document.getElementById('historyList'); list.innerHTML = "";
-        const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-        items.sort((a,b) => (b.history?.[b.history.length-1]?.ts || 0) - (a.history?.[a.history.length-1]?.ts || 0));
-        items.forEach(it => {
-            if (!it.history?.length) return;
-            const pArr = it.history.map(h => h.price); const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
-            const low = Math.min(...pArr); const last = it.history[it.history.length-1];
-            const div = document.createElement('div'); div.className = `card price-card ${last.price <= avg ? 'cheap' : ''}`;
-            div.onclick = () => openForm(it.code);
-            const src = normalizeImageSrc(it.image || it.imageUrl || it.imageData || "");
-            div.innerHTML = `<div class="d-flex align-items-center"><img src="${src || 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage'}" class="prod-thumb"><div class="flex-grow-1 overflow-hidden"><div class="fw-bold text-white small text-truncate">${it.name}</div><div class="text-secondary" style="font-size:0.6rem;">${last.store || '未設定'} / 平均 ${avg}円</div></div><div class="text-end ms-2"><div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div><div class="price-sub">最安 ${low}円 / 前回 ${last.price}円</div></div></div>`;
-            list.appendChild(div);
-        });
-    }
-    function customPrompt(msg, def = "") { return new Promise(res => { document.getElementById('dialogMsg').innerText = msg; const iArea = document.getElementById('dialogInputArea'); iArea.style.display = "block"; const i = document.getElementById('dialogInput'); i.value = def; document.getElementById('dialogCancel').style.display = "block"; document.getElementById('dialogModal').style.display = "flex"; document.getElementById('dialogOk').onclick = () => { iArea.style.display="none"; document.getElementById('dialogModal').style.display="none"; res(i.value); }; document.getElementById('dialogCancel').onclick = () => { iArea.style.display="none"; document.getElementById('dialogModal').style.display="none"; res(null); }; }); }
-    function customConfirm(msg, ok="OK", cancel="やめる") { return new Promise(res => { document.getElementById('dialogMsg').innerText = msg; const c = document.getElementById('dialogCancel'); c.style.display = "block"; c.innerText = cancel; const o = document.getElementById('dialogOk'); o.innerText = ok; document.getElementById('dialogModal').style.display = "flex"; o.onclick = () => { document.getElementById('dialogModal').style.display = "none"; res(true); }; c.onclick = () => { document.getElementById('dialogModal').style.display = "none"; res(false); }; }); }
-    function getSafeUrl(url) { let c = url.trim().replace(/\/rules$/, "").replace(/\/+$/, ""); return c.endsWith('smart_price.json') ? c : c + '/smart_price.json'; }
-    async function syncFirebase() { try { const res = await fetch(getSafeUrl(fbUrl)); const data = await res.json(); if(data) { wasWrapped = !!data.db; db = wasWrapped ? data.db : data; renderHistory(); renderStoreList(); } } catch(e){} }
-    async function syncFirebasePut() { const payload = wasWrapped ? { db: db } : db; try { await fetch(getSafeUrl(fbUrl), { method: 'PUT', body: JSON.stringify(payload) }); } catch(e){} }
-    function saveLocalOnly() { localStorage.setItem('smart_price_db', JSON.stringify(db)); }
-    function handleImage(input) { if (input.files && input.files[0]) { const reader = new FileReader(); reader.onload = (e) => { const img = new Image(); img.onload = () => { const canvas = document.createElement('canvas'); const MAX = 150; let w = img.width, h = img.height; if (w > h) { h *= MAX/w; w = MAX; } else { w *= MAX/h; h = MAX; } canvas.width = w; canvas.height = h; canvas.getContext('2d').drawImage(img, 0, 0, w, h); tempImgData = canvas.toDataURL('image/jpeg', 0.5); document.getElementById('previewImg').src = tempImgData; }; img.src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
-    function openSettings() { document.getElementById('settingsModal').style.display='flex'; document.getElementById('fb-url-input').value = fbUrl; document.getElementById('home-city-input').value = db.config.homeCity || ""; }
-    function closeSettings() { document.getElementById('settingsModal').style.display='none'; }
-    function toggleHistoryList() { const div = document.getElementById('detailHistory'); const btn = document.getElementById('toggleHistBtn'); div.style.display = (div.style.display === 'none') ? 'block' : 'none'; btn.innerText = (div.style.display === 'none') ? "購入履歴を表示（タップで編集）" : "購入履歴を隠す"; }
-    async function confirmDeleteHist() { if(editingHistIdx === null) return; if(await customConfirm("履歴を整理（除外）しますか？", "OK", "やめる")) { db.products[curBarcode].history.splice(editingHistIdx, 1); saveLocalOnly(); if(fbUrl) syncFirebasePut(); showToast("整理しました"); openForm(curBarcode); } }
-    function searchImageWeb() { window.open(`https://www.google.com/search?q=${encodeURIComponent(document.getElementById('inputName').value)}+商品画像&tbm=isch`, '_blank'); }
+  function getSafeUrl(url) {
+    let c = url.trim().replace(/\/rules$/, "").replace(/\/+$/, "");
+    return c.endsWith('smart_price.json') ? c : c + '/smart_price.json';
+  }
+
+  async function syncFirebase() {
+    try {
+      const res = await fetch(getSafeUrl(fbUrl));
+      const data = await res.json();
+      if (data) {
+        db = data.db ? data.db : data;
+        renderHistory();
+        renderStoreList();
+      }
+    } catch(e) {}
+  }
+  async function syncFirebasePut() {
+    try { await fetch(getSafeUrl(fbUrl), { method: 'PUT', body: JSON.stringify(db) }); } catch(e) {}
+  }
+
+  function setupFocusGuides() {
+    const gs = { 'inputName': "例：コーラ 500ml", 'inputPrice': "税別/税込を選んで入力" };
+    Object.keys(gs).forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.onfocus = () => showToast(gs[id]);
+    });
+  }
 </script>
 </body>
 </html>
