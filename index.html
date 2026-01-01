@@ -1,195 +1,207 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <!--
-      APP: Smart Price
-      FILE: index.html (single file)
-      VERSION: v19.9c-hf4
-      BUILD_ID: 2026-01-01_1712_hf4-auto-merge
-      DATE(JST): 2026-01-01 17:12 JST
-      TITLE: 自動統合（/db.json→/smart_price.json）＋履歴表示復旧＋店名手入力＋同期後ホーム復帰
-      CHANGES:
-        - 旧保存先 /db.json を自動読込し /smart_price.json に統合して一本化
-        - history が配列でない（オブジェクト化）場合も配列へ復元し履歴表示を復旧
-        - 「設定保存と同期」成功後に設定を自動で閉じ、ホーム（購入リスト）を再描画
-        - 店名：タグ選択＋手入力を追加。タグ選択時は入力欄へ自動反映
-        - GPS ON時：2km以内で記録がある店＋市プリセット＋手入力店を優先（空白店名は除外）
-      BUILD_PARAM: ?b=2026-01-01_1712_hf4-auto-merge
-      DEBUG_PARAM: &debug=1
-    -->
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#D50000">
-    <title>Smart Price v19.9c-hf4</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-    <style>
-        body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
-        .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-        .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
-        .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
-        .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; }
-        .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
-        .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
-        .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
-        .store-tag.gps-btn.on { background: #ff5252; color: white; }
-        .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
-        .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
-        .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
-        .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
-        .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
-        .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
-        .price-sub { font-size: 0.65rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; white-space: nowrap; }
-        .stats-strip { display: flex; flex-direction: column; background: #262626; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.75rem; border: 1px solid #333; }
-        .stats-row { display: flex; justify-content: space-around; width: 100%; }
-        .stat-item { text-align: center; flex: 1; color: #aaa; }
-        .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
-        .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#D50000" />
+  <title>Smart Price v19.9c-hf4</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" />
 
-        .form-control::placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
-        .form-control::-webkit-input-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
-        .form-control::-moz-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
-        .form-control:-ms-input-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
+  <!--
+  APP: Smart Price
+  FILE: index.html
+  VERSION: v19.9c-hf4
+  BUILD: 2026-01-01_1737_hf4-auto-merge
+  DATE(JST): 2026-01-01 17:37 JST
+  TITLE: Firebase保存場所のズレを自動統合して購入履歴を復旧（/db/db ⇄ /smart_price）、同期後ホーム復帰、店名手入力追加、Chromeキャッシュ対策
+  CHANGES:
+  - 過去データ(/db/db/products 等)と新データ(/smart_price/products)の保存場所ズレを検出し、自動で統合・集約
+  - 起動時/同期時に候補パスを探索して最もデータが多いものを採用→ローカルとマージ→/smart_priceへ保存
+  - 同期成功後、設定画面で停止せずホームへ戻し、購入履歴を即描画
+  - 店名選択が効かない端末向けに店名手入力欄を追加（選択時は自動反映）
+  - ?b= の変更検知で ServiceWorker/Cache を自動削除（Chromeの古いUI残り対策）
+  AUTHOR: Yui
+  BUILD_PARAM: ?b=2026-01-01_1737_hf4-auto-merge
+  DEBUG_PARAM: &debug=1
+  POLICY: SINGLE_FILE
+  -->
 
-        #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
-        #interactive { width: 100%; height: 100%; }
-        .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
-        .laser { position: absolute; left: 5%; width: 90%; height: 2px; background: #ff0000; box-shadow: 0 0 10px 2px #ff0000; animation: scanning 2s infinite ease-in-out; z-index: 2002; }
-        @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
-        .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
-        .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .city-chips { display: flex; overflow-x: auto; gap: 5px; padding: 5px 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
-        .city-chip { font-size: 0.75rem; padding: 4px 12px; border-radius: 15px; background: #333; color: #ccc; border: 1px solid #555; white-space: nowrap; cursor: pointer; }
-        .city-chip:active { background: #D50000; color: white; }
-    </style>
+  <style>
+    body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
+    .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+    .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
+    .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
+    .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
+    .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; user-select: none; }
+    .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
+    .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
+    .store-tag.gps-btn.on { background: #ff5252; color: white; }
+    .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
+
+    .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
+    .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
+    .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
+    .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
+    .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
+    .price-sub { font-size: 0.65rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; white-space: nowrap; }
+    .stats-strip { display: flex; flex-direction: column; background: #262626; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.75rem; border: 1px solid #333; }
+    .stats-row { display: flex; justify-content: space-around; width: 100%; }
+    .stat-item { text-align: center; flex: 1; color: #aaa; }
+    .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
+    .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+
+    .form-control::placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
+    .form-control::-webkit-input-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
+    .form-control::-moz-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
+    .form-control:-ms-input-placeholder { opacity: 1; color: rgba(255,255,255,0.45) !important; }
+
+    #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
+    #interactive { width: 100%; height: 100%; }
+    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
+    .laser { position: absolute; left: 5%; width: 90%; height: 2px; background: #ff0000; box-shadow: 0 0 10px 2px #ff0000; animation: scanning 2s infinite ease-in-out; z-index: 2002; }
+    @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
+    .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
+    .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+    .city-chips { display: flex; overflow-x: auto; gap: 5px; padding: 5px 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+    .city-chip { font-size: 0.75rem; padding: 4px 12px; border-radius: 15px; background: #333; color: #ccc; border: 1px solid #555; white-space: nowrap; cursor: pointer; }
+    .city-chip:active { background: #D50000; color: white; }
+  </style>
 </head>
-<body>
 
-<header class="header d-flex justify-content-between align-items-center">
+<body>
+  <header class="header d-flex justify-content-between align-items-center">
     <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf4</span></h5>
     <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
-</header>
+  </header>
 
-<div class="store-area"><div id="store-list" class="store-list"></div></div>
+  <div class="store-area"><div id="store-list" class="store-list"></div></div>
 
-<div class="container p-3">
+  <div class="container p-3">
     <div id="mainView">
-        <div class="row g-2 mb-4">
-            <div class="col-7"><button id="scanBtnTop" class="btn btn-danger w-100 py-3 rounded-4 shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1"></i><br>スキャン</button></div>
-            <div class="col-5"><button class="btn btn-dark w-100 py-3 rounded-4 border-secondary shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i><br>手入力</button></div>
-        </div>
-        <div id="historyList"></div>
+      <div class="row g-2 mb-4">
+        <div class="col-7"><button id="scanBtnTop" class="btn btn-danger w-100 py-3 rounded-4 shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1"></i><br>スキャン</button></div>
+        <div class="col-5"><button class="btn btn-dark w-100 py-3 rounded-4 border-secondary shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i><br>手入力</button></div>
+      </div>
+      <div id="historyList"></div>
     </div>
 
     <div id="formView" style="display:none;">
-        <div class="card p-3 shadow-lg">
-            <div id="curStoreIndicator" class="text-danger small fw-bold mb-2 text-center" style="opacity:0.8;"></div>
+      <div class="card p-3 shadow-lg">
+        <div id="curStoreIndicator" class="text-danger small fw-bold mb-2 text-center" style="opacity:0.8;"></div>
 
-            <!-- 店名（手入力）※タグ選択時もここに自動反映 -->
-            <div class="input-group input-group-sm mb-2">
-                <span class="input-group-text bg-dark text-secondary border-secondary">店名</span>
-                <input type="text" id="inputStore" class="form-control bg-dark text-white border-secondary" placeholder="上のタグから選ぶ / 直接入力">
-            </div>
+        <!-- 店名 手入力（選べない端末の救済） -->
+        <input type="text" id="storeManualInput" class="form-control bg-dark text-white border-secondary mb-3"
+               style="font-size:0.9rem;" placeholder="店名（タップで選ぶ／ここに手入力もOK）" />
 
-            <div id="formMainUI">
-                <div class="d-flex mb-3">
-                    <div style="position:relative; width:90px; height:90px; margin-right:12px;">
-                        <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;">
-                        <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
-                            <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
-                            <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
-                        </div>
-                        <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
-                    </div>
-                    <div class="flex-grow-1">
-                        <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
-                        <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
-                        <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
-                    </div>
-                </div>
-                <div id="priceSection" class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
-                    <div id="calcOptionArea" class="d-flex align-items-center mb-2">
-                        <div class="btn-group btn-group-sm w-100 me-2">
-                            <input type="radio" class="btn-check" name="taxMode" id="taxEx" value="ex" checked>
-                            <label class="btn btn-outline-danger" for="taxEx">税別</label>
-                            <input type="radio" class="btn-check" name="taxMode" id="taxIn" value="in">
-                            <label class="btn btn-outline-danger" for="taxIn">税込</label>
-                        </div>
-                        <div class="input-group input-group-sm w-50">
-                            <input type="number" id="inputDisc" class="form-control bg-dark text-white border-secondary" placeholder="0">
-                            <span class="input-group-text bg-dark text-secondary border-secondary">%引</span>
-                        </div>
-                    </div>
-                    <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0">
-                </div>
-                <div id="statsBox" class="stats-strip"></div>
-                <div id="detailHistory" class="mb-3" style="display:none;"></div>
-                <div class="text-center mb-3">
-                    <button id="toggleHistBtn" class="btn btn-sm btn-outline-secondary w-100" onclick="toggleHistoryList()">購入履歴を表示（タップで編集）</button>
-                </div>
-                <div class="d-flex gap-2 mb-3">
-                    <button id="delHistBtn" class="btn btn-outline-secondary py-3 fw-bold flex-grow-0 px-3 shadow" style="display:none;" onclick="confirmDeleteHist()">削除</button>
-                    <button id="saveBtn" class="btn btn-danger py-3 fw-bold fs-5 shadow flex-grow-1" onclick="saveData()">保存</button>
-                </div>
+        <div id="formMainUI">
+          <div class="d-flex mb-3">
+            <div style="position:relative; width:90px; height:90px; margin-right:12px;">
+              <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;">
+              <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
+                <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
+                <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
+              </div>
+              <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
             </div>
-            <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
+            <div class="flex-grow-1">
+              <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
+              <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
+              <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
+            </div>
+          </div>
+
+          <div id="priceSection" class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
+            <div id="calcOptionArea" class="d-flex align-items-center mb-2">
+              <div class="btn-group btn-group-sm w-100 me-2">
+                <input type="radio" class="btn-check" name="taxMode" id="taxEx" value="ex" checked>
+                <label class="btn btn-outline-danger" for="taxEx">税別</label>
+                <input type="radio" class="btn-check" name="taxMode" id="taxIn" value="in">
+                <label class="btn btn-outline-danger" for="taxIn">税込</label>
+              </div>
+              <div class="input-group input-group-sm w-50">
+                <input type="number" id="inputDisc" class="form-control bg-dark text-white border-secondary" placeholder="0">
+                <span class="input-group-text bg-dark text-secondary border-secondary">%引</span>
+              </div>
+            </div>
+            <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0">
+          </div>
+
+          <div id="statsBox" class="stats-strip"></div>
+          <div id="detailHistory" class="mb-3" style="display:none;"></div>
+
+          <div class="text-center mb-3">
+            <button id="toggleHistBtn" class="btn btn-sm btn-outline-secondary w-100" onclick="toggleHistoryList()">購入履歴を表示（タップで編集）</button>
+          </div>
+
+          <div class="d-flex gap-2 mb-3">
+            <button id="delHistBtn" class="btn btn-outline-secondary py-3 fw-bold flex-grow-0 px-3 shadow" style="display:none;" onclick="confirmDeleteHist()">削除</button>
+            <button id="saveBtn" class="btn btn-danger py-3 fw-bold fs-5 shadow flex-grow-1" onclick="saveData()">保存</button>
+          </div>
         </div>
-    </div>
-</div>
 
-<div id="camera-area">
+        <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="camera-area">
     <div id="interactive"></div>
     <div class="scan-frame"><div class="laser"></div></div>
     <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-4 fs-3 shadow-lg">×</button>
-</div>
+  </div>
 
-<div id="dialogModal" class="modal">
+  <div id="dialogModal" class="modal">
     <div class="modal-content text-center">
-        <h6 id="dialogTitle" class="text-secondary mb-3">Smart Price</h6>
-        <p id="dialogMsg" class="text-white mb-4"></p>
-        <div id="dialogInputArea" style="display:none;"><input type="text" id="dialogInput" class="form-control bg-dark text-white mb-3"></div>
-        <div class="d-flex gap-2">
-            <button id="dialogCancel" class="btn btn-dark flex-grow-1" style="display:none;">やめる</button>
-            <button id="dialogOk" class="btn btn-danger flex-grow-1">OK</button>
-        </div>
+      <h6 id="dialogTitle" class="text-secondary mb-3">Smart Price</h6>
+      <p id="dialogMsg" class="text-white mb-4"></p>
+      <div id="dialogInputArea" style="display:none;"><input type="text" id="dialogInput" class="form-control bg-dark text-white mb-3"></div>
+      <div class="d-flex gap-2">
+        <button id="dialogCancel" class="btn btn-dark flex-grow-1" style="display:none;">やめる</button>
+        <button id="dialogOk" class="btn btn-danger flex-grow-1">OK</button>
+      </div>
     </div>
-</div>
+  </div>
 
-<div id="settingsModal" class="modal">
+  <div id="settingsModal" class="modal">
     <div class="modal-content">
-        <h5 class="text-white mb-4 text-center">設定</h5>
-        <div class="mb-3">
-            <label class="small text-secondary">生活圏（市）</label>
-            <input type="text" id="home-city-input" class="form-control bg-dark text-white border-secondary mb-1" placeholder="例：土浦市">
-            <div id="city-history-chips" class="city-chips"></div>
-        </div>
-        <div class="mb-3">
-            <label class="small text-secondary">Firebase URL</label>
-            <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary mb-3" placeholder="https://xxx.firebaseio.com/">
-        </div>
-        <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">設定保存と同期</button>
-        <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
+      <h5 class="text-white mb-4 text-center">設定</h5>
+
+      <div class="mb-3">
+        <label class="small text-secondary">生活圏（市）</label>
+        <input type="text" id="home-city-input" class="form-control bg-dark text-white border-secondary mb-1" placeholder="例：土浦市">
+        <div id="city-history-chips" class="city-chips"></div>
+      </div>
+
+      <div class="mb-3">
+        <label class="small text-secondary">Firebase URL</label>
+        <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary mb-3" placeholder="https://xxx.firebaseio.com/">
+      </div>
+
+      <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">設定保存と同期</button>
+      <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
     </div>
-</div>
+  </div>
 
-<div id="toast" class="toast-msg"></div>
+  <div id="toast" class="toast-msg"></div>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script>
     /* 🟢 Version Labels & Debug Flags */
     const APP_VERSION = "v19.9c-hf4";
-    const BUILD_ID    = "2026-01-01_1712_hf4-auto-merge";
+    const BUILD_ID    = "2026-01-01_1737_hf4-auto-merge";
     const IS_DEBUG    = /[?&]debug=1/.test(location.search);
 
     const DEFAULT_CONFIG = { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "", homeCities: [] };
     const CITY_STORE_PRESET = {
-        "土浦市": ["カスミ土浦駅前店", "カスミ ピアシティ荒川本郷店", "ヨークベニマル", "タイヨー", "まるも", "ウエルシア"],
-        "つくば市": ["カスミ つくば竹園店", "ヨークベニマル つくば竹園店", "ロピア つくば店", "タイヨー", "ウエルシア"],
-        "東海村": ["カスミ東海店", "ヨークベニマル東海店", "イオン東海店"]
+      "土浦市": ["カスミ土浦駅前店", "カスミ ピアシティ荒川本郷店", "ヨークベニマル", "タイヨー", "まるも", "ウエルシア"],
+      "つくば市": ["カスミ つくば竹園店", "ヨークベニマル つくば竹園店", "ロピア つくば店", "タイヨー", "ウエルシア"],
+      "東海村": ["カスミ東海店", "ヨークベニマル東海店", "イオン東海店"]
     };
 
     let db = { products: {}, config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)) };
@@ -198,231 +210,451 @@
     let isGpsOn = false, curPos = null, lastGpsTime = "";
     let activeSyncController = null;
 
-    window.onload = () => {
-        loadLocal();
-        db = normalizeDb(db);
-        initCategorySelect();
-        renderStoreList();
-        renderHistory();
-        applyVersionLabels();
-        resetSyncBtn();
-        if (fbUrl) syncFirebaseAutoMerge();  // ★HF4: 自動統合で読む
-        setupFocusGuides();
-    };
+    /* ===== Chromeの古いUI残り対策：?b= が変わったらキャッシュ掃除 ===== */
+    async function maybeClearPwaCacheByBuildParam() {
+      try {
+        const b = new URLSearchParams(location.search).get('b') || "";
+        if (!b) return;
+        const last = localStorage.getItem("smart_price_last_build") || "";
+        if (last === b) return;
+        localStorage.setItem("smart_price_last_build", b);
 
-    function applyVersionLabels(){
-        document.title = `Smart Price ${APP_VERSION}`;
-        const badge = document.querySelector(".v-badge");
-        if (badge) badge.textContent = APP_VERSION;
-        if (IS_DEBUG) showToast(`build: ${BUILD_ID}`);
+        if (IS_DEBUG) showToast("cache clear...");
+
+        // Service Worker 解除
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs) { try { await r.unregister(); } catch(e) {} }
+        }
+        // Cache API 削除
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+      } catch(e) {}
     }
 
-    /* 🟢 同期ボタン復旧（起動時・復帰時の固まり対策） */
+    function applyVersionLabels(){
+      document.title = `Smart Price ${APP_VERSION}`;
+      const badge = document.querySelector(".v-badge");
+      if (badge) badge.textContent = APP_VERSION;
+      if (IS_DEBUG) showToast(`build: ${BUILD_ID}`);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      if (!t) return;
+      t.innerText = msg; t.style.opacity = 1;
+      setTimeout(() => { t.style.opacity = 0; }, 3000);
+    }
+
+    /* 🟢 ボタン復旧ロジック */
     function resetSyncBtn() {
-        const btn = document.getElementById('syncBtn');
-        if (btn) {
-            btn.disabled = false;
-            btn.innerText = "設定保存と同期";
-        }
+      const btn = document.getElementById('syncBtn');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "設定保存と同期";
+      }
     }
     window.addEventListener("pageshow", resetSyncBtn);
     window.addEventListener("beforeunload", resetSyncBtn);
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            resetSyncBtn();
-            if (activeSyncController) activeSyncController.abort();
-        }
+      if (document.hidden) {
+        resetSyncBtn();
+        if (activeSyncController) activeSyncController.abort();
+      }
     });
 
-    function showToast(msg) {
-        const t = document.getElementById('toast');
-        if (!t) return;
-        t.innerText = msg; t.style.opacity = 1;
-        setTimeout(() => { t.style.opacity = 0; }, 3000);
-    }
-
-    /* ===== URL整形（HF4: /smart_price と /db の両方を見る） ===== */
-    function normalizeBaseUrl(url) {
-        if (!url) return "";
-        let u = url.trim();
-        u = u.replace(/\/rules$/, "").replace(/\/+$/, "");
-        u = u.replace(/\.json$/, "");
-        u = u.replace(/\/smart_price$/, "");
-        u = u.replace(/\/db$/, "");
-        return u;
-    }
-    function getSmartUrl(url) {
-        const base = normalizeBaseUrl(url);
-        if (!base) return "";
-        return base.endsWith("smart_price") ? (base + ".json") : (base + "/smart_price.json");
-    }
-    function getLegacyDbUrl(url) {
-        const base = normalizeBaseUrl(url);
-        if (!base) return "";
-        return base.endsWith("db") ? (base + ".json") : (base + "/db.json");
-    }
-
-    /* ===== fetch（タイムアウト＋中断の結合） ===== */
+    /* ===== AbortSignal.any 互換（Chrome以外でも安全） ===== */
     function anySignal(signals) {
-        try {
-            if (typeof AbortSignal !== "undefined" && AbortSignal.any) return AbortSignal.any(signals.filter(Boolean));
-        } catch(e){}
-        const controller = new AbortController();
-        const onAbort = () => controller.abort();
-        (signals || []).filter(Boolean).forEach(sig => {
-            try {
-                if (sig.aborted) controller.abort();
-                else sig.addEventListener("abort", onAbort, { once: true });
-            } catch(e){}
-        });
-        return controller.signal;
+      try {
+        if (typeof AbortSignal !== "undefined" && typeof AbortSignal.any === "function") {
+          return AbortSignal.any(signals.filter(Boolean));
+        }
+      } catch(e) {}
+      const ctrl = new AbortController();
+      const onAbort = () => { try { ctrl.abort(); } catch(e) {} };
+      for (const s of (signals || [])) {
+        if (!s) continue;
+        if (s.aborted) { onAbort(); break; }
+        try { s.addEventListener("abort", onAbort, { once: true }); } catch(e) {}
+      }
+      return ctrl.signal;
     }
 
+    /** 🟢 fetchヘルパ（タイムアウト＋外部signal統合） */
     async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
-        const internal = new AbortController();
-        const tid = setTimeout(() => internal.abort(), timeout);
-        const sig = options.signal ? anySignal([options.signal, internal.signal]) : internal.signal;
-        try {
-            const res = await fetch(resource, { ...options, signal: sig });
-            clearTimeout(tid);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res;
-        } catch (e) {
-            clearTimeout(tid);
-            throw e;
-        }
+      const internal = new AbortController();
+      const tid = setTimeout(() => internal.abort(), timeout);
+      const signal = options.signal ? anySignal([options.signal, internal.signal]) : internal.signal;
+      try {
+        const res = await fetch(resource, { ...options, signal });
+        clearTimeout(tid);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+      } catch (e) {
+        clearTimeout(tid);
+        throw e;
+      }
     }
 
-    /* ===== DB正規化（HF4: historyがオブジェクトでも配列へ復元） ===== */
-    function objToArrayIfIndexed(v) {
-        if (!v || typeof v !== "object" || Array.isArray(v)) return v;
-        const keys = Object.keys(v).filter(k => /^\d+$/.test(k)).sort((a,b)=>Number(a)-Number(b));
-        if (keys.length === 0) return v;
-        return keys.map(k => v[k]).filter(x => x && typeof x === "object");
-    }
-
-    function normalizeHistoryArray(h) {
-        if (!h) return [];
-        if (Array.isArray(h)) return h.filter(x => x && typeof x === "object");
-        const converted = objToArrayIfIndexed(h);
-        if (Array.isArray(converted)) return converted;
-        return [];
-    }
-
-    /** 🟢 DB正規化：旧キー(items/purchases/hist)吸収＋history復元 */
+    /** 🟢 DB正規化：旧キー(items/purchases/hist)吸収 */
     function normalizeDb(input) {
-        let o = (input && typeof input === "object") ? input : {};
-        if (!o.products && o.items && typeof o.items === "object") o.products = o.items;
+      let o = (input && typeof input === "object") ? input : {};
+      if (!o.products && o.items && typeof o.items === "object") o.products = o.items;
 
-        if (!o.products || typeof o.products !== "object") o.products = {};
-        if (!o.config || typeof o.config !== "object") o.config = {};
-        if (!Array.isArray(o.config.categories)) o.config.categories = [...DEFAULT_CONFIG.categories];
-        if (typeof o.config.lastTax !== "string") o.config.lastTax = DEFAULT_CONFIG.lastTax;
-        if (typeof o.config.homeCity !== "string") o.config.homeCity = DEFAULT_CONFIG.homeCity;
-        if (!Array.isArray(o.config.homeCities)) o.config.homeCities = o.config.homeCity ? [o.config.homeCity] : [];
+      if (!o.products || typeof o.products !== "object") o.products = {};
+      if (!o.config || typeof o.config !== "object") o.config = {};
+      if (!Array.isArray(o.config.categories)) o.config.categories = [...DEFAULT_CONFIG.categories];
+      if (typeof o.config.lastTax !== "string") o.config.lastTax = DEFAULT_CONFIG.lastTax;
+      if (typeof o.config.homeCity !== "string") o.config.homeCity = DEFAULT_CONFIG.homeCity;
+      if (!Array.isArray(o.config.homeCities)) o.config.homeCities = o.config.homeCity ? [o.config.homeCity] : [];
 
-        Object.keys(o.products).forEach(code => {
-            const p = o.products[code] || {};
-            // history/purchases/hist がオブジェクト化していても配列へ
-            let h = p.history;
-            if (!h && p.purchases) h = p.purchases;
-            if (!h && p.hist) h = p.hist;
-            p.history = normalizeHistoryArray(h);
-
-            // store空白を除去（タグに空文字が出ないように）
-            p.history = p.history.map(x => {
-                const store = (x.store ?? "").toString().trim();
-                return {
-                    ...x,
-                    store: store ? store : "未設定",
-                    price: Number(x.price || 0),
-                    ts: Number(x.ts || 0),
-                };
-            });
-
-            o.products[code] = p;
-        });
-
-        if (o.config.homeCity) {
-            const hc = o.config.homeCity.trim();
-            o.config.homeCity = hc;
-            o.config.homeCities = [hc, ...o.config.homeCities.map(x=>String(x||"").trim()).filter(c => c && c !== hc)].slice(0, 5);
-        } else {
-            o.config.homeCities = (o.config.homeCities || []).map(x=>String(x||"").trim()).filter(Boolean).slice(0, 5);
+      Object.keys(o.products).forEach(code => {
+        const p = o.products[code] || {};
+        if (!Array.isArray(p.history)) {
+          if (Array.isArray(p.purchases)) p.history = p.purchases;
+          else if (Array.isArray(p.hist)) p.history = p.hist;
+          else p.history = [];
         }
-        // categoriesの空白除去
-        o.config.categories = (o.config.categories || []).map(x=>String(x||"").trim()).filter(Boolean);
+        // historyの各要素の最低限整形
+        p.history = p.history.map(h => {
+          const x = (h && typeof h === "object") ? h : {};
+          if (typeof x.price !== "number") x.price = Number(x.price || 0);
+          if (!x.ts) x.ts = x.date ? Number(x.date) : x.ts;
+          if (!x.ts) x.ts = Date.now();
+          if (typeof x.store !== "string") x.store = (x.store == null ? "" : String(x.store));
+          return x;
+        }).filter(h => h.price > 0);
 
-        return o;
+        o.products[code] = p;
+      });
+
+      if (o.config.homeCity) {
+        o.config.homeCities = [o.config.homeCity, ...o.config.homeCities.filter(c => c !== o.config.homeCity)].slice(0, 5);
+      }
+      return o;
     }
 
     function loadLocal() {
-        try {
-            const saved = localStorage.getItem('smart_price_db');
-            if (saved) db = JSON.parse(saved);
-            db = normalizeDb(db);
-            const elIn = document.getElementById('taxIn');
-            const elEx = document.getElementById('taxEx');
-            if (db.config.lastTax === "in" && elIn) elIn.checked = true;
-            else if (elEx) elEx.checked = true;
-        } catch(e) {
-            db = normalizeDb({});
-        }
+      try {
+        const saved = localStorage.getItem('smart_price_db');
+        if (saved) db = JSON.parse(saved);
+        db = normalizeDb(db);
+
+        const elIn = document.getElementById('taxIn');
+        const elEx = document.getElementById('taxEx');
+        if (db.config.lastTax === "in" && elIn) elIn.checked = true;
+        else if (elEx) elEx.checked = true;
+      } catch(e) {
+        db = normalizeDb({});
+      }
     }
+
     function saveLocalOnly() { localStorage.setItem('smart_price_db', JSON.stringify(db)); }
 
-    /* ===== wrapper判定（/db.json は {db:{...}} の可能性） ===== */
-    function checkWrapped(data) {
-        if (!data) return false;
-        if (data.products || data.items) return false;
-        if (data.db && (data.db.products || data.db.items)) return true;
-        return false;
-    }
-    function unwrapIfWrapped(data) {
-        if (!data || typeof data !== "object") return null;
-        return checkWrapped(data) ? data.db : data;
+    /* ===== Firebase URL 生成（候補パスも作る） ===== */
+    function sanitizeFbRoot(u) {
+      if (!u) return "";
+      let s = String(u).trim();
+      s = s.replace(/\/+$/,"");
+      s = s.replace(/\.json$/,"");
+
+      // 入力が /smart_price や /db 等を含んでいても root に戻す
+      const cutList = ["/smart_price", "/db/db", "/db"];
+      for (const cut of cutList) {
+        if (s.endsWith(cut)) s = s.slice(0, -cut.length);
+      }
+      s = s.replace(/\/+$/,"");
+      return s;
     }
 
-    /* ===== HF4: DBマージ（旧/db と 新/smart_price を合体） ===== */
-    function mergeUniqueHistory(a, b) {
-        const A = normalizeHistoryArray(a);
-        const B = normalizeHistoryArray(b);
-        const map = new Map();
-        const put = (x) => {
-            if (!x || typeof x !== "object") return;
-            const ts = Number(x.ts || 0);
-            const price = Number(x.price || 0);
-            const store = (x.store ?? "").toString().trim();
-            const lat = (x.lat != null) ? Number(x.lat) : null;
-            const lng = (x.lng != null) ? Number(x.lng) : null;
-            const key = `${ts}|${price}|${store}|${lat}|${lng}`;
-            if (!map.has(key)) map.set(key, { ...x, store: store ? store : "未設定", price, ts, ...(lat!=null?{lat}:{}), ...(lng!=null?{lng}:{}) });
+    function fbUrlFor(root, path) {
+      const r = sanitizeFbRoot(root);
+      if (!r) return "";
+      if (path === ".") return `${r}/.json`;          // ルート
+      return `${r}/${path}.json`;                    // ノード
+    }
+
+    function unwrapDb(data) {
+      let d = data;
+      let depth = 0;
+      while (d && typeof d === "object" && !Array.isArray(d) && depth < 5) {
+        const hasProducts = !!(d.products || d.items);
+        if (hasProducts) break;
+        if (d.db && typeof d.db === "object") { d = d.db; depth++; continue; }
+        break;
+      }
+      return d;
+    }
+
+    function productCount(o) {
+      try {
+        const x = normalizeDb(o);
+        return Object.keys(x.products || {}).length;
+      } catch(e) { return 0; }
+    }
+
+    async function fetchCloudAt(url) {
+      try {
+        const res = await fetchWithTimeout(url, {}, 12000);
+        const data = await res.json();
+        const raw = unwrapDb(data);
+        const norm = normalizeDb(raw);
+        const cnt = Object.keys(norm.products || {}).length;
+        return { ok: true, norm, cnt, raw: data };
+      } catch(e) {
+        return { ok: false, err: e };
+      }
+    }
+
+    async function fetchBestCloudDb(rootUrl) {
+      const root = sanitizeFbRoot(rootUrl);
+      const candidates = [
+        { key: "smart_price", url: fbUrlFor(root, "smart_price") },
+        { key: "db",         url: fbUrlFor(root, "db") },
+        { key: "db/db",      url: fbUrlFor(root, "db/db") },
+        { key: "root",       url: fbUrlFor(root, ".") },
+      ];
+
+      let best = { key: "", cnt: -1, norm: normalizeDb({}) };
+      let smart = { cnt: -1, norm: normalizeDb({}) };
+
+      for (const c of candidates) {
+        if (!c.url) continue;
+        const r = await fetchCloudAt(c.url);
+        if (!r.ok) continue;
+
+        if (c.key === "smart_price") smart = { cnt: r.cnt, norm: r.norm };
+        if (r.cnt > best.cnt) best = { key: c.key, cnt: r.cnt, norm: r.norm };
+      }
+
+      // smart_price より best が多いなら「ズレ保存」を検出
+      const needsMigration = (best.key && best.key !== "smart_price" && best.cnt > (smart.cnt >= 0 ? smart.cnt : 0));
+      return { best, smart, needsMigration };
+    }
+
+    function mergeHistory(a, b) {
+      const A = Array.isArray(a) ? a : [];
+      const B = Array.isArray(b) ? b : [];
+      const all = [...A, ...B].map(h => {
+        const x = (h && typeof h === "object") ? { ...h } : {};
+        x.price = Number(x.price || 0);
+        x.ts = Number(x.ts || Date.now());
+        x.store = (typeof x.store === "string") ? x.store : (x.store == null ? "" : String(x.store));
+        return x;
+      }).filter(h => h.price > 0);
+
+      // 重複除去：ts/price/store が同じものは1つに
+      const seen = new Set();
+      const out = [];
+      for (const h of all) {
+        const k = `${h.ts}|${h.price}|${h.store || ""}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push(h);
+      }
+      out.sort((x,y) => (x.ts||0) - (y.ts||0));
+      return out;
+    }
+
+    function mergeDb(localDb, cloudDb) {
+      const L = normalizeDb(localDb);
+      const C = normalizeDb(cloudDb);
+      const out = normalizeDb({});
+
+      // config はローカル優先（市・カテゴリなど）
+      out.config = { ...C.config, ...L.config };
+      out.config.categories = Array.from(new Set([...(C.config.categories||[]), ...(L.config.categories||[])]));
+      out.config.homeCities = Array.from(new Set([...(L.config.homeCities||[]), ...(C.config.homeCities||[])]));
+      if (L.config.homeCity) {
+        out.config.homeCities = [L.config.homeCity, ...out.config.homeCities.filter(x => x !== L.config.homeCity)].slice(0,5);
+      }
+
+      // products は union
+      const keys = new Set([...Object.keys(C.products||{}), ...Object.keys(L.products||{})]);
+      for (const code of keys) {
+        const cp = C.products[code] || {};
+        const lp = L.products[code] || {};
+        const p = { ...cp, ...lp };
+
+        // history は統合
+        p.history = mergeHistory(cp.history, lp.history);
+
+        // 基本情報が片方にしか無い場合は補完
+        p.name = lp.name || cp.name || p.name || "";
+        p.category = lp.category || cp.category || p.category || "";
+        p.maker = lp.maker || cp.maker || p.maker || "";
+        p.image = lp.image || cp.image || p.image || "";
+
+        out.products[code] = p;
+      }
+      return normalizeDb(out);
+    }
+
+    async function writeCanonicalSmartPrice(rootUrl, payloadDb, signal) {
+      const root = sanitizeFbRoot(rootUrl);
+      const url = fbUrlFor(root, "smart_price");
+      const body = JSON.stringify(payloadDb);
+      await fetchWithTimeout(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body,
+        signal
+      }, 15000);
+      return true;
+    }
+
+    /* ===== UI関連 ===== */
+    function initCategorySelect() {
+      db = normalizeDb(db);
+      const sel = document.getElementById('inputCategory');
+      if(!sel) return;
+      sel.innerHTML =
+        `<option value="__NONE__">カテゴリを選ぶ</option>` +
+        db.config.categories.map(c => `<option value="${c}">${c}</option>`).join('') +
+        `<option value="ADD">+ 追記</option>`;
+
+      sel.onchange = async () => {
+        if(sel.value === "ADD") {
+          const n = await customPrompt("新しいカテゴリ名");
+          if(n) { db.config.categories.push(n); initCategorySelect(); sel.value = n; }
+          else { sel.selectedIndex = 0; }
+        }
+      };
+    }
+
+    function setCurStore(name) {
+      const n = (name || "").trim();
+      curStore = n ? n : "未設定";
+
+      const ind = document.getElementById('curStoreIndicator');
+      if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
+
+      const inp = document.getElementById('storeManualInput');
+      if (inp) inp.value = (curStore === "未設定") ? "" : curStore;
+    }
+
+    function renderStoreList(manualPriority = []) {
+      db = normalizeDb(db);
+      const list = document.getElementById('store-list');
+      if(!list) return;
+
+      // 近所候補（GPS ONかつ lat/lng 入っている履歴のみ距離判定）
+      const nearHistoryStores = new Set();
+      const freqHistoryStores = {};
+
+      Object.values(db.products).forEach(p => (p.history||[]).forEach(h => {
+        if(!h.store || h.store === "未設定") return;
+
+        // 出現回数は常にカウント（距離に関係なし）
+        freqHistoryStores[h.store] = (freqHistoryStores[h.store] || 0) + 1;
+
+        // 近所判定は GPS ON かつ 現在地あり かつ 履歴にlat/lngあり
+        if(isGpsOn && curPos && h.lat && h.lng) {
+          const d = getDistance(curPos.lat, curPos.lng, h.lat, h.lng);
+          if(d <= 2.0) nearHistoryStores.add(h.store);
+        }
+      }));
+
+      const sortedFreq = Object.keys(freqHistoryStores).sort((a,b) => freqHistoryStores[b] - freqHistoryStores[a]);
+      const cityStores = CITY_STORE_PRESET[db.config.homeCity] || [];
+      const defaults = db.config.homeCity ? [] : ["イオン", "業務スーパー", "クリエイト", "スギ薬局", "マツキヨ"];
+
+      const manual = (manualPriority || []).map(x => (x||"").trim()).filter(Boolean);
+      const finalSet = ["未設定", ...new Set([...manual, ...Array.from(nearHistoryStores), ...cityStores, ...sortedFreq, ...defaults])];
+
+      const gpsTxt = isGpsOn ? `GPS<span class="gps-status">●${lastGpsTime}</span>` : `GPS<span class="gps-status">OFF</span>`;
+      list.innerHTML = `<span class="store-tag gps-btn ${isGpsOn?'on':''}" onclick="toggleGps()">${gpsTxt}</span>`;
+
+      finalSet.forEach(name => {
+        const span = document.createElement('span');
+        span.className = 'store-tag' + (name === curStore ? ' active' : '');
+        span.innerText = name;
+        span.onclick = () => {
+          setCurStore(name);
+          // ハイライト更新
+          renderStoreList([ (document.getElementById('storeManualInput')?.value||"").trim() ]);
         };
-        A.forEach(put); B.forEach(put);
-        const out = Array.from(map.values());
-        out.sort((x,y) => (x.ts||0) - (y.ts||0));
-        return out;
+        list.appendChild(span);
+      });
     }
 
-    function unionOrdered(primary, secondary) {
-        const out = [];
-        const seen = new Set();
-        (primary || []).forEach(x => { const s = String(x||"").trim(); if (s && !seen.has(s)) { seen.add(s); out.push(s); }});
-        (secondary || []).forEach(x => { const s = String(x||"").trim(); if (s && !seen.has(s)) { seen.add(s); out.push(s); }});
-        return out;
+    function renderStats(history) {
+      const box = document.getElementById('statsBox');
+      if (!box) return;
+      if (!Array.isArray(history) || history.length === 0) { box.innerHTML = "過去データなし"; return; }
+      const pArr = history.map(h => Number(h.price || 0)).filter(v => v > 0);
+      if (!pArr.length) { box.innerHTML = "過去データなし"; return; }
+      const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
+      const low = Math.min(...pArr);
+      const last = pArr[pArr.length-1];
+      box.innerHTML = `<div class="stats-row">
+        <div class="stat-item">平均<span class="stat-val">${avg}円</span></div>
+        <div class="stat-item">最安<span class="stat-val text-danger">${low}円</span></div>
+        <div class="stat-item">前回<span class="stat-val">${last}円</span></div>
+      </div>`;
     }
 
-    function mergeDb(legacyRaw, smartRaw) {
-        const L = normalizeDb(JSON.parse(JSON.stringify(legacyRaw || {})));
-        const S = normalizeDb(JSON.parse(JSON.stringify(smartRaw || {})));
-        const out = normalizeDb({});
+    function toggleHistoryList() {
+      const div = document.getElementById('detailHistory');
+      const btn = document.getElementById('toggleHistBtn');
+      if (!div || !btn) return;
+      const isHidden = (div.style.display === "none" || !div.style.display);
+      div.style.display = isHidden ? "block" : "none";
+      btn.innerText = isHidden ? "購入履歴を隠す" : "購入履歴を表示（タップで編集）";
+    }
 
-        // config
-        out.config.homeCity = (S.config.homeCity || L.config.homeCity || "").trim();
-        out.config.homeCities = unionOrdered([out.config.homeCity], unionOrdered(S.config.homeCities, L.config.homeCities)).slice(0,5);
-        out.config.categories = unionOrdered(S.config.categories, L.config.categories);
-        out.config.lastTax = (S.config.lastTax || L.config.lastTax || DEFAULT_CONFIG.lastTax);
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      if(!list) return;
 
-        // products
-        const codes = new Set([...Object.keys(L.products||{}), ...Object.keys(S.products||{})]);
-        codes.forEach(c
+      list.innerHTML = "";
+      db = normalizeDb(db);
+
+      const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
+      items.sort((a,b) => (b.history?.[b.history.length-1]?.ts || 0) - (a.history?.[a.history.length-1]?.ts || 0));
+
+      let shown = 0;
+      items.forEach(it => {
+        if (!it.history || !it.history.length) return;
+        const last = it.history[it.history.length-1];
+        const div = document.createElement('div');
+        div.className = 'card price-card';
+        div.onclick = () => openForm(it.code);
+
+        const img = it.image || 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage';
+        const store = (last.store || "未設定");
+        const price = Number(last.price || 0);
+
+        div.innerHTML = `<div class="d-flex align-items-center">
+          <img src="${img}" class="prod-thumb">
+          <div class="flex-grow-1 overflow-hidden">
+            <div class="fw-bold text-white small text-truncate">${escapeHtml(it.name || "")}</div>
+            <div class="text-secondary" style="font-size:0.6rem;">${escapeHtml(store)}</div>
+          </div>
+          <div class="text-end ms-2">
+            <div class="price-main">${price}<span style="font-size:0.6rem;">円</span></div>
+          </div>
+        </div>`;
+        list.appendChild(div);
+        shown++;
+      });
+
+      if (shown === 0) {
+        list.innerHTML = `<div class="text-secondary small text-center py-4">購入履歴がまだありません</div>`;
+      }
+
+      if (IS_DEBUG) {
+        const prodCount = Object.keys(db.products || {}).length;
+        const histCount = Object.values(db.products || {}).reduce((a,p)=>a+(p.history?.length||0),0);
+        showToast(`debug: products=${prodCount}, history=${histCount}`);
+      }
+    }
+
+    function renderDetailHistory(history) {
+      const div = document.getElementById('detailHistory');
+      if(!div) return;
+      div.innerHTML = "";
+      const safeHistory = Array.isArray(history) ? history : [];
+      [...safeHistory].reverse().forEach((h, i
