@@ -236,12 +236,22 @@
       if (IS_DEBUG) showToast(`build: ${BUILD_ID}`);
     }
 
-    function showToast(msg) {
+    // トースト（10秒表示・連打でも消えない）
+    let __toastTimer = null;
+
+    function showToast(msg, ms = 10000) {
       const t = document.getElementById('toast');
       if (!t) return;
-      t.innerText = msg; t.style.opacity = 1;
-      setTimeout(() => { t.style.opacity = 0; }, 3000);
-    }
+
+      t.textContent = String(msg ?? "");
+      t.style.opacity = 1;
+
+      if (__toastTimer) clearTimeout(__toastTimer);
+      __toastTimer = setTimeout(() => {
+      t.style.opacity = 0;
+      }, ms);
+      }
+
 
     /* ===== AbortSignal.any 互換（Chrome以外でも安全） ===== */
     function anySignal(signals) {
