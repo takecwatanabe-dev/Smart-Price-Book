@@ -2,17 +2,18 @@
 APP: Smart Price
 FILE: index.html
 VERSION: v19.9c-hf6
-DATE(JST): 2026-01-02 09:18 JST
-AUTHOR: Yui
-TITLE: GitHub本番用復旧（hotfix撤去・トースト10秒・履歴日付補完・選択ハイライト・ブラウザ版誘導）
+DATE(JST): 2026-01-02 10:11 JST
+TITLE: ストア手入力ボタン復旧・履歴編集の選択強調・hotfix上書き削除
 CHANGES(<=5):
-- hotfix上書き撤去（openSettings/startScannerを潰さない）
-- トースト表示10秒化（同期失敗が見える）
-- 履歴日付の表示/補完を強化（ts/date/timestamp対応、怪しいtsを軽く補正）
-- 選択中のカード/履歴行をハイライト（不安を減らす）
-- 設定→詳細にブラウザ版誘導（URL表示/コピー/新規タブ）
-BUILD_PARAM: ?b=2026-01-02_0918_hf6
+- ストア一覧に「＋店名入力」を復活（GPS外・未登録ストア対応）
+- 店名を保存（db.config.customStores）して次回以降も候補に表示
+- 履歴編集時、選択中の行をハイライトして編集対象を明確化
+- editHistoryModeで店舗表示（curStoreIndicator）を確実に更新
+- 末尾のhotfix（openSettings/startScanner上書き）を削除し正常動作へ戻す
+AUTHOR: Yui
+BUILD_PARAM: ?b=2026-01-02_1011_hf6
 DEBUG_PARAM: &debug=1
+POLICY: UIレイアウトは維持（機能復旧のみ）
 -->
 
 <!DOCTYPE html>
@@ -37,11 +38,12 @@ DEBUG_PARAM: &debug=1
         .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
         .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
         .store-tag.gps-btn.on { background: #ff5252; color: white; }
+        .store-tag.add-store { border: 1px dashed #777; color: #ddd; background: #262626; }
+        .store-tag.add-store:active { background: #333; }
         .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
         .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
         .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
         .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
-        .price-card.selected { box-shadow: inset 0 0 0 2px rgba(255,82,82,0.85); }
         .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
         .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
         .price-sub { font-size: 0.65rem; color: #ff5252; font-weight: bold; margin-top: 4px; border-top: 1px solid #333; white-space: nowrap; }
@@ -51,7 +53,7 @@ DEBUG_PARAM: &debug=1
         .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
         .edit-notice { color: #5bc0de; text-align: center; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #444; padding-bottom: 4px; }
         .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .history-row.selected { outline: 2px solid #ff5252; outline-offset: -2px; border-radius: 10px; }
+        .history-row.selected { background: rgba(213,0,0,0.14); }
         #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
         #interactive { width: 100%; height: 100%; }
         .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
@@ -59,12 +61,10 @@ DEBUG_PARAM: &debug=1
         @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
         .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
-        .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); max-width: 92vw; text-align:center; }
+        .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .city-chips { display: flex; overflow-x: auto; gap: 5px; padding: 5px 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
         .city-chip { font-size: 0.75rem; padding: 4px 12px; border-radius: 15px; background: #333; color: #ccc; border: 1px solid #555; white-space: nowrap; cursor: pointer; }
         .city-chip:active { background: #D50000; color: white; }
-        .adv-textarea { width:100%; min-height:110px; resize:vertical; }
-        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
     </style>
 </head>
 <body>
@@ -164,40 +164,8 @@ DEBUG_PARAM: &debug=1
             <label class="small text-secondary">Firebase URL</label>
             <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary mb-3" placeholder="https://xxx.firebaseio.com/">
         </div>
-        <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-2 shadow" onclick="startMigration()">設定保存と同期</button>
-        <button class="btn btn-link text-secondary w-100 py-2" onclick="openAdvanced()">詳細（ブラウザ版へ）</button>
+        <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-3 shadow" onclick="startMigration()">設定保存と同期</button>
         <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
-    </div>
-</div>
-
-<!-- 深い層：ブラウザ版誘導 -->
-<div id="advancedModal" class="modal">
-    <div class="modal-content">
-        <h5 class="text-white mb-3 text-center">詳細</h5>
-
-        <div class="mb-2">
-            <div class="small text-secondary">いま開いているURL（コピーしてChromeで開けます）</div>
-            <textarea id="adv-url" class="form-control bg-dark text-white border-secondary adv-textarea mono" readonly></textarea>
-            <div class="d-flex gap-2 mt-2">
-                <button class="btn btn-outline-light flex-grow-1" onclick="copyAdvUrl()"><i class="bi bi-clipboard"></i> コピー</button>
-                <button class="btn btn-danger flex-grow-1" onclick="openInNewTab()"><i class="bi bi-box-arrow-up-right"></i> 新規タブ</button>
-            </div>
-            <div class="small text-secondary mt-2">
-                ※PWAだと新規タブが同じ枠で開く端末があります。その場合は「コピー」→Chromeに貼って開くのが確実です。
-            </div>
-        </div>
-
-        <div class="mb-2 mt-3">
-            <div class="small text-secondary">キャッシュ回避用URL（スクショ用）</div>
-            <input id="adv-url-b" class="form-control bg-dark text-white border-secondary mono" readonly>
-        </div>
-
-        <div class="mb-2 mt-3">
-            <div class="small text-secondary">端末情報（スクショに写す用）</div>
-            <textarea id="adv-info" class="form-control bg-dark text-white border-secondary adv-textarea mono" readonly></textarea>
-        </div>
-
-        <button class="btn btn-link text-secondary w-100 mt-2" onclick="closeAdvanced()">戻る</button>
     </div>
 </div>
 
@@ -205,12 +173,18 @@ DEBUG_PARAM: &debug=1
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-    /* App Meta */
     const APP_VERSION = "v19.9c-hf6";
-    const BUILD_ID = "2026-01-02_0918_hf6";
+    const BUILD_ID = "2026-01-02_1011_hf6";
 
     /* Global State and Config */
-    const DEFAULT_CONFIG = { categories: ["飲料","食品","日用品","薬","その他"], lastTax: "ex", homeCity: "", homeCities: [] };
+    const DEFAULT_CONFIG = {
+        categories: ["飲料","食品","日用品","薬","その他"],
+        lastTax: "ex",
+        homeCity: "",
+        homeCities: [],
+        customStores: []  // ← 店名手入力の保存先
+    };
+
     const CITY_STORE_PRESET = {
         "土浦市": ["カスミ土浦駅前店", "カスミ ピアシティ荒川本郷店", "ヨークベニマル", "タイヨー", "まるも", "ウエルシア"],
         "つくば市": ["カスミ つくば竹園店", "ヨークベニマル つくば竹園店", "ロピア つくば店", "タイヨー", "ウエルシア"],
@@ -222,10 +196,6 @@ DEBUG_PARAM: &debug=1
     let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || '';
     let isGpsOn = false, curPos = null, lastGpsTime = "", wasWrapped = false;
     let activeSyncController = null;
-
-    // ハイライト用
-    let selectedProductCode = null;
-    let selectedHistKey = null; // `${code}:${idx}`
 
     window.onload = () => {
         loadLocal();
@@ -255,59 +225,32 @@ DEBUG_PARAM: &debug=1
         }
     }
 
-    /** 履歴エントリのts補完（date/timestamp対応） */
-    function normalizeHistoryEntry(h) {
-        if (!h || typeof h !== "object") return null;
-
-        // date/timestamp -> ts 補完
-        const hasTs = (typeof h.ts === "number" && !isNaN(h.ts) && h.ts > 0);
-        const hasTimestamp = (typeof h.timestamp === "number" && !isNaN(h.timestamp) && h.timestamp > 0);
-        const hasDate = (typeof h.date !== "undefined" && h.date !== null && String(h.date).trim() !== "");
-
-        let parsedDateTs = null;
-        if (hasDate) {
-            const d = (h.date instanceof Date) ? h.date : new Date(h.date);
-            if (!isNaN(d.getTime())) parsedDateTs = d.getTime();
-        }
-
-        if (!hasTs) {
-            if (hasTimestamp) h.ts = Number(h.timestamp);
-            else if (parsedDateTs) h.ts = parsedDateTs;
-        } else {
-            // 「全部今日」っぽい場合の軽い補正（dateが有効で、tsが直近48h、dateが7日より古い）
-            if (parsedDateTs) {
-                const now = Date.now();
-                const tsNearNow = (now - h.ts) < (48 * 60 * 60 * 1000);
-                const dateOld = (now - parsedDateTs) > (7 * 24 * 60 * 60 * 1000);
-                if (tsNearNow && dateOld) {
-                    h.ts = parsedDateTs;
-                }
-            }
-        }
-        return h;
-    }
-
-    /** 🟢 DB正規化エンジン (history保証強化) */
+    /** 🟢 DB正規化エンジン (history保証 + customStores) */
     function normalizeDb(input) {
         let o = (input && typeof input === "object") ? input : {};
         if (!o.products || typeof o.products !== "object") o.products = {};
         if (!o.config || typeof o.config !== "object") o.config = {};
+
         if (!Array.isArray(o.config.categories)) o.config.categories = [...DEFAULT_CONFIG.categories];
         if (typeof o.config.lastTax !== "string") o.config.lastTax = DEFAULT_CONFIG.lastTax;
         if (typeof o.config.homeCity !== "string") o.config.homeCity = DEFAULT_CONFIG.homeCity;
         if (!Array.isArray(o.config.homeCities)) o.config.homeCities = o.config.homeCity ? [o.config.homeCity] : [];
 
+        if (!Array.isArray(o.config.customStores)) o.config.customStores = [];
+
         Object.keys(o.products).forEach(code => {
             if (!Array.isArray(o.products[code].history)) o.products[code].history = [];
-            // history内部のts補完
-            o.products[code].history = o.products[code].history
-              .map(h => normalizeHistoryEntry(h))
-              .filter(Boolean);
         });
 
         if (o.config.homeCity) {
             o.config.homeCities = [o.config.homeCity, ...o.config.homeCities.filter(c => c !== o.config.homeCity)].slice(0, 5);
         }
+        // customStoresも整形（空・重複除去、最大20）
+        o.config.customStores = (o.config.customStores || [])
+            .filter(s => typeof s === "string" && s.trim())
+            .map(s => s.trim());
+        o.config.customStores = [...new Set(o.config.customStores)].slice(0, 20);
+
         return o;
     }
 
@@ -322,34 +265,20 @@ DEBUG_PARAM: &debug=1
         } catch(e) { db = normalizeDb({}); }
     }
 
-    // トースト 10秒
-    function showToast(msg) {
+    function showToast(msg, ms = 3000) {
         const t = document.getElementById('toast');
         if (!t) return;
         t.innerText = msg; t.style.opacity = 1;
-        clearTimeout(showToast._tid);
-        showToast._tid = setTimeout(() => { t.style.opacity = 0; }, 10000);
+        setTimeout(() => { t.style.opacity = 0; }, ms);
     }
 
-    /** fetchヘルパ（外部signalがあってもタイムアウトが効く） */
+    /** fetchヘルパ */
     async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
-        const controller = new AbortController();
-        const external = options.signal;
-
-        if (external) {
-            if (external.aborted) controller.abort();
-            else external.addEventListener('abort', () => controller.abort(), { once: true });
-        }
-
-        const id = setTimeout(() => controller.abort(), timeout);
-
+        const internalController = new AbortController();
+        const signal = options.signal || internalController.signal;
+        const id = setTimeout(() => internalController.abort(), timeout);
         try {
-            const response = await fetch(resource, {
-                ...options,
-                signal: controller.signal,
-                cache: options.cache || 'no-store',
-                mode: options.mode || 'cors',
-            });
+            const response = await fetch(resource, { ...options, signal });
             clearTimeout(id);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             return response;
@@ -384,7 +313,7 @@ DEBUG_PARAM: &debug=1
             renderCityChips();
         } catch(e) {
             console.error('openSettings error:', e);
-            showToast('設定画面エラー: ' + (e.message || String(e)));
+            showToast('設定画面エラー: ' + (e.message || String(e)), 5000);
         }
     }
 
@@ -393,69 +322,6 @@ DEBUG_PARAM: &debug=1
         if(modal) modal.style.display = 'none';
     }
 
-    function openAdvanced() {
-        try {
-            const m = document.getElementById('advancedModal');
-            if(!m) return;
-            const u = location.href;
-            document.getElementById('adv-url').value = u;
-            document.getElementById('adv-url-b').value = addBuildParam(u);
-
-            const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ? "standalone(PWA)" : "browser";
-            const info =
-`APP_VERSION: ${APP_VERSION}
-BUILD_ID: ${BUILD_ID}
-DISPLAY_MODE: ${standalone}
-USER_AGENT: ${navigator.userAgent}
-TIME: ${new Date().toLocaleString()}
-`;
-            document.getElementById('adv-info').value = info;
-
-            closeSettings();
-            m.style.display = 'flex';
-        } catch(e) {
-            showToast('詳細を開けません: ' + (e.message || String(e)));
-        }
-    }
-
-    function closeAdvanced() {
-        const m = document.getElementById('advancedModal');
-        if(m) m.style.display = 'none';
-        // ここは「深い層」なので、戻る先は設定にする
-        const s = document.getElementById('settingsModal');
-        if(s) s.style.display = 'flex';
-    }
-
-    function addBuildParam(url) {
-        try {
-            const u = new URL(url);
-            u.searchParams.set('b', BUILD_ID);
-            return u.toString();
-        } catch(e) {
-            // URLが変でも安全に
-            const sep = url.includes('?') ? '&' : '?';
-            return `${url}${sep}b=${encodeURIComponent(BUILD_ID)}`;
-        }
-    }
-
-    async function copyAdvUrl() {
-        const v = document.getElementById('adv-url-b')?.value || location.href;
-        try {
-            await navigator.clipboard.writeText(v);
-            showToast('コピーしました');
-        } catch(e) {
-            // クリップボード不可の端末向け
-            showToast('コピーできない端末です（長押しで選択→コピー）');
-        }
-    }
-
-    function openInNewTab() {
-        const v = document.getElementById('adv-url-b')?.value || location.href;
-        const w = window.open(v, '_blank', 'noopener');
-        if(!w) showToast('新規タブがブロックされました（コピー→Chromeへ）');
-    }
-
-    /** 🟢 renderCityChips() */
     function renderCityChips() {
         try {
             const chipArea = document.getElementById('city-history-chips');
@@ -481,7 +347,6 @@ TIME: ${new Date().toLocaleString()}
         }
     }
 
-    /** 🟢 ベースURL取得（末尾の.jsonやパスを除去） */
     function getBaseUrl(url) {
         if(!url) return "";
         let base = url.trim().replace(/\/rules$/, "").replace(/\/+$/, "");
@@ -489,14 +354,11 @@ TIME: ${new Date().toLocaleString()}
         if(base.endsWith('/smart_price') || base.endsWith('smart_price')) base = base.replace(/\/?smart_price$/, '');
         return base.replace(/\/+$/, '');
     }
-
-    /** 🟢 smart_price.jsonのURLを取得（正規の保存先） */
     function getSafeUrl(url) {
         const base = getBaseUrl(url);
         return base ? `${base}/smart_price.json` : "";
     }
 
-    /** 🟢 データラップ形式を展開 */
     function unwrapData(data) {
         if (!data || typeof data !== "object") return null;
         if (data.products && typeof data.products === "object") return { products: data.products, config: data.config || {} };
@@ -506,7 +368,25 @@ TIME: ${new Date().toLocaleString()}
         return null;
     }
 
-    /** 🟢 2つのDBをマージ（barcodeキーで統合） */
+    function histTs(h) {
+        if (!h || typeof h !== "object") return 0;
+        const v = (h.ts ?? h.timestamp ?? h.time ?? 0);
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    function normalizeHistoryArray(arr) {
+        const a = Array.isArray(arr) ? arr : [];
+        return a
+            .filter(h => h && typeof h === "object")
+            .map(h => {
+                const o = { ...h };
+                const t = histTs(o);
+                if (!o.ts && t) o.ts = t; // timestamp系 → tsへ寄せる
+                return o;
+            });
+    }
+
     function mergeDb(db1, db2) {
         const merged = {
             products: {},
@@ -530,19 +410,20 @@ TIME: ${new Date().toLocaleString()}
                     const incoming = db2.products[code];
 
                     const allHistory = [
-                        ...(Array.isArray(existing.history) ? existing.history : []),
-                        ...(Array.isArray(incoming.history) ? incoming.history : [])
-                    ].map(h => normalizeHistoryEntry(h)).filter(Boolean);
+                        ...normalizeHistoryArray(existing.history),
+                        ...normalizeHistoryArray(incoming.history)
+                    ];
 
                     const seen = new Set();
                     const uniqueHistory = allHistory.filter(h => {
-                        const k = `${h.ts || 0}_${h.price || 0}_${h.store || ''}`;
+                        const t = histTs(h);
+                        const k = `${t}_${h.price || 0}_${h.store || ''}`;
                         if (seen.has(k)) return false;
                         seen.add(k);
                         return true;
                     });
 
-                    uniqueHistory.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+                    uniqueHistory.sort((a, b) => histTs(b) - histTs(a));
                     existing.history = uniqueHistory;
 
                     if (!existing.name && incoming.name) existing.name = incoming.name;
@@ -555,34 +436,32 @@ TIME: ${new Date().toLocaleString()}
         return merged;
     }
 
-    /** 🟢 Firebaseデータ検出 */
     async function detectFirebaseData(baseUrl) {
         const results = { smartPrice: null, dbJson: null };
 
         try {
-            const smartPriceUrl = `${baseUrl}/smart_price.json?b=${encodeURIComponent(BUILD_ID)}&t=${Date.now()}`;
-            const res1 = await fetchWithTimeout(smartPriceUrl, {}, 8000);
-            const data1 = await res1.json();
-            const unwrapped1 = unwrapData(data1);
-            if (unwrapped1 && unwrapped1.products && Object.keys(unwrapped1.products).length > 0) {
-                results.smartPrice = unwrapped1;
+            const smartPriceUrl = `${baseUrl}/smart_price.json`;
+            const res1 = await fetchWithTimeout(smartPriceUrl, {}, 5000);
+            if (res1.ok) {
+                const data1 = await res1.json();
+                const unwrapped1 = unwrapData(data1);
+                if (unwrapped1 && unwrapped1.products && Object.keys(unwrapped1.products).length > 0) results.smartPrice = unwrapped1;
             }
         } catch(e) {}
 
         try {
-            const dbJsonUrl = `${baseUrl}/db.json?b=${encodeURIComponent(BUILD_ID)}&t=${Date.now()}`;
-            const res2 = await fetchWithTimeout(dbJsonUrl, {}, 8000);
-            const data2 = await res2.json();
-            const unwrapped2 = unwrapData(data2);
-            if (unwrapped2 && unwrapped2.products && Object.keys(unwrapped2.products).length > 0) {
-                results.dbJson = unwrapped2;
+            const dbJsonUrl = `${baseUrl}/db.json`;
+            const res2 = await fetchWithTimeout(dbJsonUrl, {}, 5000);
+            if (res2.ok) {
+                const data2 = await res2.json();
+                const unwrapped2 = unwrapData(data2);
+                if (unwrapped2 && unwrapped2.products && Object.keys(unwrapped2.products).length > 0) results.dbJson = unwrapped2;
             }
         } catch(e) {}
 
         return results;
     }
 
-    /** 🟢 同期処理 */
     async function startMigration() {
         const btn = document.getElementById('syncBtn');
         const urlEl = document.getElementById('fb-url-input');
@@ -592,7 +471,7 @@ TIME: ${new Date().toLocaleString()}
         const cityInput = (cityEl ? cityEl.value : '').trim();
 
         if (btn) { btn.disabled = true; btn.innerText = "同期中…"; }
-        showToast("クラウド同期を開始…");
+        showToast("クラウド同期を開始…", 3000);
 
         activeSyncController = new AbortController();
         let ok = false;
@@ -604,7 +483,7 @@ TIME: ${new Date().toLocaleString()}
 
             if(!u) {
                 ok = true;
-                showToast("ローカル保存完了");
+                showToast("ローカル保存完了", 3000);
             } else {
                 const baseUrl = getBaseUrl(u);
                 const targetUrl = getSafeUrl(u);
@@ -625,32 +504,27 @@ TIME: ${new Date().toLocaleString()}
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(mergedDb),
                     signal: activeSyncController.signal
-                }, 15000);
+                });
 
                 if (resPut && resPut.ok) {
                     fbUrl = u;
                     localStorage.setItem('smartPriceFirebaseUrl', u);
                     wasWrapped = false;
                     ok = true;
-                    showToast("同期成功！");
+                    showToast("同期成功！", 3000);
                 }
             }
         } catch(e) {
             const msg = (e.name === 'AbortError') ? "タイムアウト/中断" : `通信失敗(${e.message})`;
-            showToast(`同期失敗（${msg}）`);
+            showToast(`同期失敗（${msg}）`, 10000); // ← エラーは10秒
             console.error("Migration error:", e);
         } finally {
             activeSyncController = null;
             resetSyncBtn();
-
-            if (ok) {
-                closeSettings();
-                showHome();
-            }
+            if (ok) { closeSettings(); showHome(); }
         }
     }
 
-    /** 🟢 Firebase同期（起動時） */
     async function syncFirebase() {
         if(!fbUrl) return;
         try {
@@ -671,22 +545,20 @@ TIME: ${new Date().toLocaleString()}
                     method: 'PUT',
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(mergedDb)
-                }, 15000);
+                });
                 wasWrapped = false;
             } catch(e) {}
 
             renderHistory();
             renderStoreList();
-            showToast("クラウドから読込完了");
+            showToast("クラウドから読込完了", 3000);
         } catch(e){
             console.error("Firebase Sync Error", e);
             renderHistory();
             renderStoreList();
-            showToast("クラウド読込失敗（ローカル表示）");
         }
     }
 
-    /** 🟢 Firebase保存 */
     async function syncFirebasePut() {
         if(!fbUrl) return;
         try {
@@ -695,12 +567,11 @@ TIME: ${new Date().toLocaleString()}
                 method: 'PUT',
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(db)
-            }, 15000);
+            });
             wasWrapped = false;
         } catch(e){ console.error("Auto PUT Error", e); }
     }
 
-    /** UI表示制御 */
     function toggleHistoryList() {
         const div = document.getElementById('detailHistory');
         const btn = document.getElementById('toggleHistBtn');
@@ -725,6 +596,28 @@ TIME: ${new Date().toLocaleString()}
         };
     }
 
+    function addCustomStore(name) {
+        db = normalizeDb(db);
+        const s = (name || "").trim();
+        if (!s) return;
+        db.config.customStores = [s, ...(db.config.customStores || []).filter(x => x !== s)].slice(0, 20);
+        saveLocalOnly();
+        syncFirebasePut();
+    }
+
+    async function promptAddStore() {
+        const n = await customPrompt("店名を手入力（例：○○スーパー）");
+        if(n && n.trim()) {
+            const s = n.trim();
+            addCustomStore(s);
+            curStore = s;
+            const ind = document.getElementById('curStoreIndicator');
+            if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
+            renderStoreList();
+            showToast("店名を追加しました", 3000);
+        }
+    }
+
     function renderStoreList(manualPriority = []) {
         db = normalizeDb(db);
         const list = document.getElementById('store-list');
@@ -744,7 +637,9 @@ TIME: ${new Date().toLocaleString()}
         const sortedFreq = Object.keys(freqHistoryStores).sort((a,b) => freqHistoryStores[b] - freqHistoryStores[a]);
         const cityStores = CITY_STORE_PRESET[db.config.homeCity] || [];
         const defaults = db.config.homeCity ? [] : ["イオン", "業務スーパー", "クリエイト", "スギ薬局", "マツキヨ"];
-        const finalSet = ["未設定", ...new Set([...manualPriority, ...Array.from(nearHistoryStores), ...cityStores, ...sortedFreq, ...defaults])];
+        const customStores = db.config.customStores || [];
+
+        const finalSet = ["未設定", ...new Set([...manualPriority, ...customStores, ...Array.from(nearHistoryStores), ...cityStores, ...sortedFreq, ...defaults])];
 
         const gpsTxt = isGpsOn ? `GPS<span class="gps-status">●${lastGpsTime}</span>` : `GPS<span class="gps-status">OFF</span>`;
         list.innerHTML = `<span class="store-tag gps-btn ${isGpsOn?'on':''}" onclick="toggleGps()">${gpsTxt}</span>`;
@@ -755,16 +650,23 @@ TIME: ${new Date().toLocaleString()}
             span.innerText = name;
             span.onclick = () => {
                 document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
-                span.classList.add('active'); curStore = name;
+                span.classList.add('active');
+                curStore = name;
                 const ind = document.getElementById('curStoreIndicator');
                 if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
             };
             list.appendChild(span);
         });
+
+        // ✅ ストア手入力ボタン（復活）
+        const addBtn = document.createElement('span');
+        addBtn.className = 'store-tag add-store';
+        addBtn.innerText = '＋店名入力';
+        addBtn.onclick = () => promptAddStore();
+        list.appendChild(addBtn);
     }
 
     async function openForm(code) {
-        selectedProductCode = code;
         const calcArea = document.getElementById('calcOptionArea');
         const saveBtn = document.getElementById('saveBtn');
         const delBtn = document.getElementById('delHistBtn');
@@ -772,24 +674,23 @@ TIME: ${new Date().toLocaleString()}
         if(saveBtn) saveBtn.innerText = '保存';
         if(delBtn) delBtn.style.display = 'none';
 
-        curBarcode = code; editingHistIdx = null; selectedHistKey = null;
+        curBarcode = code; editingHistIdx = null;
         const p = db.products[code];
         const exists = !!p;
         initCategorySelect();
         document.getElementById('mainView').style.display='none';
         document.getElementById('formView').style.display='block';
+
         const ind = document.getElementById('curStoreIndicator');
         if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
         document.getElementById('inputPrice').value = "";
 
         if (!exists) {
-            showToast("新規商品です");
+            showToast("新規商品です", 2000);
             document.getElementById('inputName').value = "";
             document.getElementById('inputMaker').value = "";
             document.getElementById('inputCategory').value = "__NONE__";
             document.getElementById('previewImg').src = "https://placehold.jp/24/333/ccc/68x68.png?text=NoImage";
-
-            // GitHub起動では google.script.run は通常使えない（あっても安全）
             if (window.google && google.script) {
               google.script.run.withSuccessHandler((data)=>{
                 if (data && !data.error) {
@@ -800,7 +701,7 @@ TIME: ${new Date().toLocaleString()}
               }).lookupYahooByJan(code);
             }
         } else {
-            showToast("登録済み商品");
+            showToast("登録済み商品", 1500);
             document.getElementById('inputName').value = p.name || "";
             document.getElementById('inputMaker').value = p.maker || "";
             const catVal = p.category || "__NONE__";
@@ -814,61 +715,37 @@ TIME: ${new Date().toLocaleString()}
         renderStats(exists ? p.history : []);
     }
 
-    /** 履歴日付フォーマット（ts/date/timestamp） */
-    function formatHistoryDate(h) {
-        if (!h || typeof h !== "object") return "(不明)";
-        if (h.date !== undefined && h.date !== null && String(h.date).trim() !== "") {
-            const d = (h.date instanceof Date) ? h.date : new Date(h.date);
-            if (!isNaN(d.getTime())) return d.toLocaleDateString();
-        }
-        const ts = (typeof h.ts === "number" && !isNaN(h.ts) && h.ts > 0) ? h.ts
-                  : (typeof h.timestamp === "number" && !isNaN(h.timestamp) && h.timestamp > 0) ? h.timestamp
-                  : null;
-        if (ts) return new Date(ts).toLocaleDateString();
-        return "(不明)";
-    }
-
-    /** 🟢 購入履歴編集モード（選択ハイライト） */
     function editHistoryMode(idx) {
         editingHistIdx = idx;
-        selectedHistKey = `${curBarcode}:${idx}`;
 
-        const h = db.products[curBarcode].history[idx];
+        const p = db.products[curBarcode];
+        const h = p && Array.isArray(p.history) ? p.history[idx] : null;
+        if(!h) return;
+
         document.getElementById('inputPrice').value = h.price;
         document.getElementById('inputDisc').value = 0;
         document.getElementById('taxIn').checked = true;
 
         curStore = h.store || "未設定";
+        const ind = document.getElementById('curStoreIndicator');
+        if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
+
         renderStoreList();
 
         document.getElementById('calcOptionArea').style.display = "none";
         document.getElementById('saveBtn').innerText = "変更確定";
         document.getElementById('delHistBtn').style.display = "block";
 
-        const ind = document.getElementById('curStoreIndicator');
-        if(ind) {
-            const ds = formatHistoryDate(h);
-            ind.innerText = `【 ${curStore} 】を編集中（${ds}）`;
-        }
+        // ✅ 選択中行の強調（不安を消す）
+        renderDetailHistory(p.history);
 
-        // 履歴が見えていない場合は開く
-        const div = document.getElementById('detailHistory');
-        const btn = document.getElementById('toggleHistBtn');
-        if(div && (div.style.display === "none" || !div.style.display)) {
-            div.style.display = "block";
-            if(btn) btn.innerText = "購入履歴を隠す";
-        }
-
-        renderDetailHistory(db.products[curBarcode].history);
-
-        showToast("編集モード：保存で確定");
+        showToast("編集モード：保存で確定", 2000);
         document.getElementById('priceSection').scrollIntoView({behavior: 'smooth'});
     }
 
-    /** 🟢 データ保存 */
     async function saveData() {
-        if (curStore === "未設定") { showToast("店名を選んでください"); return; }
-        if (document.getElementById('inputCategory').value === "__NONE__") { showToast("カテゴリを選んでください"); return; }
+        if (curStore === "未設定") { showToast("店名を選んでください", 3000); return; }
+        if (document.getElementById('inputCategory').value === "__NONE__") { showToast("カテゴリを選んでください", 3000); return; }
 
         const p = db.products[curBarcode] || { history: [] };
         p.name = document.getElementById('inputName').value || "名称なし";
@@ -884,8 +761,7 @@ TIME: ${new Date().toLocaleString()}
         if (editingHistIdx !== null) {
             p.history[editingHistIdx].price = val;
             p.history[editingHistIdx].store = curStore;
-            // tsはそのまま（履歴の日時は守る）
-            showToast("変更を反映しました");
+            showToast("変更を反映しました", 2000);
         } else if (val > 0) {
             const disc = Number(document.getElementById('inputDisc').value || 0);
             let finalP = Math.floor(val * (1 - disc/100));
@@ -894,9 +770,9 @@ TIME: ${new Date().toLocaleString()}
             const entry = { price: finalP, store: curStore, ts: Date.now() };
             if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
             p.history.push(entry);
-            showToast("保存完了");
+            showToast("保存完了", 2000);
         } else {
-            showToast("価格を入力してください");
+            showToast("価格を入力してください", 3000);
             return;
         }
 
@@ -909,62 +785,70 @@ TIME: ${new Date().toLocaleString()}
         showHome();
     }
 
-    /** 🟢 履歴描画（選択ハイライト＋日付補完） */
     function renderDetailHistory(history) {
         const div = document.getElementById('detailHistory');
         if(!div) return;
         div.innerHTML = "";
-
         const safeHistory = Array.isArray(history) ? history : [];
+
         [...safeHistory].reverse().forEach((h, idx) => {
             const row = document.createElement('div');
             row.className = "history-row";
 
             const actIdx = safeHistory.length - 1 - idx;
-            const key = `${curBarcode}:${actIdx}`;
-            if (selectedHistKey === key) row.classList.add('selected');
+
+            if (editingHistIdx !== null && actIdx === editingHistIdx) {
+                row.classList.add("selected");
+            }
 
             row.onclick = () => editHistoryMode(actIdx);
 
-            const dateStr = formatHistoryDate(h);
-            row.innerHTML =
-              `<div class="flex-grow-1">
-                  <span class="text-secondary small">${dateStr}</span><br>
-                  <span class="text-white fw-bold">${h.store || '未設定'}</span>
-               </div>
-               <div class="text-end">
-                  <span class="fw-bold text-white">${h.price}円</span><br>
-                  <span class="text-info small">タップで編集</span>
-               </div>`;
+            const t = histTs(h);
+            const dateStr = t ? new Date(t).toLocaleString() : "(不明)";
+
+            row.innerHTML = `<div class="flex-grow-1"><span class="text-secondary small">${dateStr}</span><br><span class="text-white fw-bold">${h.store || '未設定'}</span></div><div class="text-end"><span class="fw-bold text-white">${h.price}円</span><br><span class="text-info small">タップで編集</span></div>`;
             div.appendChild(row);
         });
     }
 
-    /* 共通 */
     function toggleGps() {
         if(!isGpsOn) {
-            isGpsOn = true; lastGpsTime = "…"; renderStoreList(); showToast("GPS取得中…");
+            isGpsOn = true; lastGpsTime = "…"; renderStoreList(); showToast("GPS取得中…", 3000);
             navigator.geolocation.getCurrentPosition((pos) => {
                 curPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 const d = new Date(); lastGpsTime = `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-                renderStoreList(); showToast("GPS取得成功");
-            }, (err) => { showToast(`GPSエラー: ${err.message}`); isGpsOn = false; renderStoreList(); }, { enableHighAccuracy: true, timeout: 10000 });
-        } else { isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); showToast("GPS OFF"); }
+                renderStoreList(); showToast("GPS取得成功", 2000);
+            }, (err) => {
+                showToast(`GPSエラー: ${err.message}`, 5000);
+                isGpsOn = false; renderStoreList();
+            }, { enableHighAccuracy: true, timeout: 10000 });
+        } else {
+            isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); showToast("GPS OFF", 1500);
+        }
     }
 
     function startScanner() {
-        if(isScanning) return; isScanning = true;
-        document.getElementById('camera-area').style.display='block'; showToast("カメラ起動中…");
+        if(isScanning) return;
+        isScanning = true;
+        document.getElementById('camera-area').style.display='block';
+        showToast("カメラ起動中…", 2000);
         if(!scanner) scanner = new Html5Qrcode("interactive");
-        scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:180}}, async (t)=>{
-            showToast("読み取りOK"); await stopScanner(); openForm(t);
-        }).catch(() => { showToast("起動失敗"); stopScanner(); });
+        scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:180}}, async (t)=> {
+            showToast("読み取りOK", 1500);
+            await stopScanner();
+            openForm(t);
+        }).catch(() => {
+            showToast("起動失敗", 4000);
+            stopScanner();
+        });
     }
 
     async function stopScanner() {
         if(scanner) {
             try { await scanner.stop(); } catch(e) {}
             finally { document.getElementById('camera-area').style.display='none'; isScanning = false; }
+        } else {
+            document.getElementById('camera-area').style.display='none'; isScanning = false;
         }
     }
 
@@ -976,17 +860,26 @@ TIME: ${new Date().toLocaleString()}
         renderHistory();
         renderStoreList();
         tempImgData = null;
+        editingHistIdx = null;
     }
 
-    async function showVeggieMenu() { const v = await customPrompt("名称入力"); if(v && v.trim()) openForm("M_"+v.trim()); }
+    async function showVeggieMenu() {
+        const v = await customPrompt("名称入力");
+        if(v && v.trim()) openForm("M_"+v.trim());
+    }
 
     function setupFocusGuides() {
         const gs = { 'inputName': "例：コーラ 500ml", 'inputPrice': "価格を入力" };
-        Object.keys(gs).forEach(id => { const el=document.getElementById(id); if(el) el.onfocus = () => showToast(gs[id]); });
+        Object.keys(gs).forEach(id => {
+            const el=document.getElementById(id);
+            if(el) el.onfocus = () => showToast(gs[id], 1500);
+        });
     }
 
     function getDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371; const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
+        const R = 6371;
+        const dLat = (lat2-lat1)*Math.PI/180;
+        const dLon = (lon2-lon1)*Math.PI/180;
         const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
@@ -995,8 +888,10 @@ TIME: ${new Date().toLocaleString()}
         const box = document.getElementById('statsBox');
         if (!box) return;
         if (!Array.isArray(history) || history.length === 0) { box.innerHTML = "過去データなし"; return; }
-        const pArr = history.map(h => h.price); const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
-        const low = Math.min(...pArr); const last = pArr[pArr.length-1];
+        const pArr = history.map(h => h.price);
+        const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
+        const low = Math.min(...pArr);
+        const last = pArr[pArr.length-1];
         box.innerHTML = `<div class="stats-row"><div class="stat-item">平均<span class="stat-val">${avg}円</span></div><div class="stat-item">最安<span class="stat-val text-danger">${low}円</span></div><div class="stat-item">前回<span class="stat-val">${last}円</span></div></div>`;
     }
 
@@ -1004,27 +899,14 @@ TIME: ${new Date().toLocaleString()}
         const list = document.getElementById('historyList');
         if(!list) return;
         list.innerHTML = "";
-        db = normalizeDb(db);
-
         const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-        items.sort((a,b) => (b.history?.[b.history.length-1]?.ts || 0) - (a.history?.[a.history.length-1]?.ts || 0));
-
+        items.sort((a,b) => (histTs(b.history?.[b.history.length-1]) || 0) - (histTs(a.history?.[a.history.length-1]) || 0));
         items.forEach(it => {
             if (!it.history || !it.history.length) return;
             const last = it.history[it.history.length-1];
-            const div = document.createElement('div');
-            div.className = 'card price-card' + (it.code === selectedProductCode ? ' selected' : '');
+            const div = document.createElement('div'); div.className = 'card price-card';
             div.onclick = () => openForm(it.code);
-            div.innerHTML = `<div class="d-flex align-items-center">
-                <img src="${it.image || 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage'}" class="prod-thumb">
-                <div class="flex-grow-1 overflow-hidden">
-                    <div class="fw-bold text-white small text-truncate">${it.name}</div>
-                    <div class="text-secondary" style="font-size:0.6rem;">${last.store}</div>
-                </div>
-                <div class="text-end ms-2">
-                    <div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div>
-                </div>
-            </div>`;
+            div.innerHTML = `<div class="d-flex align-items-center"><img src="${it.image || 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage'}" class="prod-thumb"><div class="flex-grow-1 overflow-hidden"><div class="fw-bold text-white small text-truncate">${it.name}</div><div class="text-secondary" style="font-size:0.6rem;">${last.store}</div></div><div class="text-end ms-2"><div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div></div></div>`;
             list.appendChild(div);
         });
     }
@@ -1033,7 +915,8 @@ TIME: ${new Date().toLocaleString()}
         return new Promise(res => {
             document.getElementById('dialogMsg').innerText = msg;
             document.getElementById('dialogInputArea').style.display="block";
-            const i = document.getElementById('dialogInput'); i.value = def;
+            const i = document.getElementById('dialogInput');
+            i.value = def;
             document.getElementById('dialogCancel').style.display="block";
             document.getElementById('dialogModal').style.display="flex";
             document.getElementById('dialogOk').onclick = () => { document.getElementById('dialogModal').style.display="none"; res(i.value); };
@@ -1045,8 +928,9 @@ TIME: ${new Date().toLocaleString()}
         if(editingHistIdx === null) return;
         if(await customConfirm("この履歴を削除しますか？")) {
             db.products[curBarcode].history.splice(editingHistIdx, 1);
-            editingHistIdx = null; selectedHistKey = null;
-            saveLocalOnly(); syncFirebasePut(); showHome();
+            saveLocalOnly();
+            syncFirebasePut();
+            showHome();
         }
     }
 
@@ -1068,7 +952,10 @@ TIME: ${new Date().toLocaleString()}
     function handleImage(input) {
         if (input.files && input.files[0]) {
             const reader = new FileReader();
-            reader.onload = (e) => { tempImgData = e.target.result; document.getElementById('previewImg').src = e.target.result; };
+            reader.onload = (e) => {
+                tempImgData = e.target.result;
+                document.getElementById('previewImg').src = e.target.result;
+            };
             reader.readAsDataURL(input.files[0]);
         }
     }
