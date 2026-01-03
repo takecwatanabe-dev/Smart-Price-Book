@@ -1,1618 +1,1047 @@
-<!--
-APP: Smart Price
-FILE: index.html
-VERSION: v19.9c-hf13-pwa2-snsimg1
-DATE(JST): 2026-01-03 20:07 JST
-TITLE: SNS画像（URL貼るだけ）— 商品ページURLから代表画像を自動抽出→共有サムネURL化（長いリンク対応）
-CHANGES:
-- searchImageWeb: URL入力時に「画像URL/商品ページURL」を受け取り、代表画像を自動抽出して共有サムネURL（wsrv）へ変換
-- Google画像の長いURL（imgurl等）や商品ページ（og:image/twitter:image）からの抽出を追加
-- 画像は data: をクラウドへ載せず、共有URL化で端末差を消し、SNS的に“積み上がる”方式へ
-AUTHOR: Yui
-BUILD_PARAM: ?b=2026-01-03_2007_snsimg1
-DEBUG_PARAM: &debug=1
-POLICY: 見た目は極力維持（内部だけ安定化）
--->
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="manifest" href="manifest.json?b=2026-01-03_2007_snsimg1">
+  <!--
+  APP: Smart Price
+  FILE: index.html
+  VERSION: v19.9c-hf13-pwa2-imgflow1
+  DATE(JST): 2026-01-03 21:55 JST
+  TITLE: 黒画面対策＋画像検索→貼付フロー（一覧→戻ったらURL貼る）＋URL正規化
+  CHANGES:
+  - 起動時の強制リロードを廃止（history.replaceStateで ?b 付与）→ 黒画面を減らす
+  - 🔍は先に画像検索（一覧）を開く → 戻ったらURL貼付ダイアログ（女性目線で迷いにくい導線）
+  - Google画像の長いURLから imgurl 等を抽出して画像URLに正規化
+  - sw.js/manifest.json が無い環境でのエラーを抑制（SWは存在確認できたときのみ登録）
+  AUTHOR: Yui
+  BUILD_PARAM(b): ?b=2026-01-03_2155_imgflow1
+  DEBUG_PARAM: &debug=1
+  POLICY: UIは大きく変えず、内部の流れだけ改善
+  -->
+
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#D50000" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#D50000">
-  <title>Smart Price v19.9c-hf13-pwa2-snsimg1</title>
+
+  <title>Smart Price v19.9c</title>
+
+  <!-- PWA（ある環境だけでOK） -->
+  <link id="manifestLink" rel="manifest" href="manifest.json" />
+
+  <!-- UI（既存と同系のBootstrap） -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
   <style>
-    body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; touch-action: manipulation; }
-    .header { background: linear-gradient(135deg, #D50000, #9b0000); padding: 12px 15px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-    .v-badge { background: #ff5252; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; margin-left: 10px; font-weight: bold; }
-    .store-area { background: #1e1e1e; padding: 10px; border-bottom: 1px solid #333; min-height: 55px; }
-    .store-list { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
-    .store-tag { padding: 6px 14px; border: 1px solid #444; border-radius: 20px; white-space: nowrap; font-size: 0.85rem; background: #2c2c2c; color: #ccc; }
-    .store-tag.active { background: #D50000; color: white; border-color: #D50000; }
-    .store-tag.gps-btn { border: 1px solid #ff5252; color: #ff5252; }
-    .store-tag.gps-btn.on { background: #ff5252; color: white; }
-    .store-tag.add-store { border: 1px dashed #777; color: #ddd; background: #262626; }
-    .store-tag.add-store:active { background: #333; }
-    .gps-status { font-size: 0.6rem; margin-left: 4px; opacity: 0.9; }
-
-    .card { background-color: #1e1e1e; border: 1px solid #333; margin-bottom: 10px; border-radius: 12px; overflow: hidden; }
-    .price-card { padding: 12px; border-left: 4px solid #444; cursor: pointer; }
-    .price-card.cheap { border-left-color: #ff5252; background: linear-gradient(90deg, #2a1a1a 0%, #1e1e1e 100%); }
-    .prod-thumb { width: 68px; height: 68px; object-fit: contain; background: #fff; border-radius: 8px; margin-right: 12px; }
-
-    .price-main { font-size: 1.25rem; font-weight: bold; color: #fff; line-height: 1; }
-    .stats-strip { display: flex; flex-direction: column; background: #262626; padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.75rem; border: 1px solid #333; }
-    .stats-row { display: flex; justify-content: space-around; width: 100%; }
-    .stat-item { text-align: center; flex: 1; color: #aaa; }
-    .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
-
-    .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    /* ✅ 見失わない赤枠（レイアウトを崩さない） */
-    .history-row.selected {
-      background: rgba(213,0,0,0.10);
-      box-shadow: inset 0 0 0 2px rgba(213,0,0,0.95);
-      border-radius: 10px;
-      padding-left: 10px;
-      padding-right: 10px;
-      margin: 6px 0;
+    body { font-family: sans-serif; background-color: #121212; color: #e0e0e0; padding-bottom: 90px; }
+    .container { max-width: 980px; }
+    .card { background: #1c1c1c; border: 1px solid rgba(255,255,255,.08); }
+    .btn-primary { background: #D50000; border-color: #D50000; }
+    .btn-primary:hover { background: #b80000; border-color: #b80000; }
+    .form-control, .form-select { background: #141414; color: #e0e0e0; border: 1px solid rgba(255,255,255,.12); }
+    .form-control:focus, .form-select:focus { border-color: rgba(213,0,0,.65); box-shadow: 0 0 0 .2rem rgba(213,0,0,.18); }
+    .muted { color: rgba(255,255,255,.65); }
+    .bottom-bar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+      background: rgba(18,18,18,.95); border-top: 1px solid rgba(255,255,255,.10);
+      padding: 10px;
+    }
+    .thumb {
+      width: 54px; height: 54px; border-radius: 10px; object-fit: cover;
+      border: 1px solid rgba(255,255,255,.15); background: #0f0f0f;
+    }
+    .list-row { display: flex; gap: 10px; align-items: center; }
+    .grow { flex: 1; min-width: 0; }
+    .line1 { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .line2 { font-size: 12px; color: rgba(255,255,255,.68); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .badge-soft { background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.10); }
+    .toast-wrap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 96px; z-index: 2000; width: min(520px, calc(100% - 20px)); }
+    .toast-msg { background: rgba(0,0,0,.78); border: 1px solid rgba(255,255,255,.18); border-radius: 14px; padding: 12px 14px; }
+    .debug-badge {
+      position: fixed; top: 10px; right: 10px; z-index: 3000;
+      font-size: 12px; background: rgba(213,0,0,.85); color: #fff;
+      padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25);
     }
 
-    #camera-area { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 2000; }
-    #interactive { width: 100%; height: 100%; }
-    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 180px; z-index: 2001; box-shadow: 0 0 0 4000px rgba(0,0,0,0.65); }
-    .laser { position: absolute; left: 5%; width: 90%; height: 2px; background: #ff0000; box-shadow: 0 0 10px 2px #ff0000; animation: scanning 2s infinite ease-in-out; z-index: 2002; }
-    @keyframes scanning { 0% { top: 15%; opacity: 0.2; } 50% { top: 85%; opacity: 1; } 100% { top: 15%; opacity: 0.2; } }
-
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; }
-    .modal-content { background: #1e1e1e; padding: 25px; border-radius: 20px; width: 95%; max-width: 450px; border: 1px solid #D50000; }
-
-    .toast-msg { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); background: rgba(50,50,50,0.95); color: #fff; padding: 10px 25px; border-radius: 25px; font-size: 0.85rem; z-index: 5000; opacity: 0; transition: 0.3s; pointer-events: none; border: 1px solid #777; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-
-    .city-chips { display: flex; overflow-x: auto; gap: 5px; padding: 5px 0; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
-    .city-chip { font-size: 0.75rem; padding: 4px 12px; border-radius: 15px; background: #333; color: #ccc; border: 1px solid #555; white-space: nowrap; cursor: pointer; }
-    .city-chip:active { background: #D50000; color: white; }
-
-    .url-box { font-size: 0.9rem; padding: 12px; border-radius: 12px; }
-    .hint { font-size: 0.75rem; color: #aaa; line-height: 1.4; }
+    /* かんたんプロンプト（UIは増やさず、内部の小窓だけ） */
+    .prompt-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 4000;
+      display: none; align-items: center; justify-content: center; padding: 14px;
+    }
+    .prompt-box {
+      width: min(560px, 100%);
+      background: #1c1c1c; border: 1px solid rgba(255,255,255,.14);
+      border-radius: 16px; padding: 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.45);
+    }
+    .prompt-title { font-weight: 700; margin-bottom: 6px; }
+    .prompt-text { font-size: 13px; color: rgba(255,255,255,.75); white-space: pre-wrap; }
+    .prompt-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
   </style>
 </head>
 
 <body>
-<header class="header d-flex justify-content-between align-items-center">
-  <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf13</span></h5>
-  <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
-</header>
+  <div id="debugBadge" class="debug-badge" style="display:none;"></div>
 
-<div class="store-area"><div id="store-list" class="store-list"></div></div>
-
-<div class="container p-3">
-  <div id="mainView">
-    <div class="row g-2 mb-4">
-      <div class="col-7"><button id="scanBtnTop" class="btn btn-danger w-100 py-3 rounded-4 shadow" onclick="startScanner()"><i class="bi bi-upc-scan fs-1"></i><br>スキャン</button></div>
-      <div class="col-5"><button class="btn btn-dark w-100 py-3 rounded-4 border-secondary shadow" onclick="showVeggieMenu()"><i class="bi bi-keyboard fs-1"></i><br>手入力</button></div>
-    </div>
-    <div id="historyList"></div>
-  </div>
-
-  <div id="formView" style="display:none;">
-    <div class="card p-3 shadow-lg">
-      <div id="curStoreIndicator" class="text-danger small fw-bold mb-2 text-center" style="opacity:0.8;"></div>
-
-      <div class="text-center mb-2">
-        <button id="storeJumpBtn" class="btn btn-sm btn-outline-secondary w-100" style="display:none;" onclick="jumpToStoreChips()">店名を変更（上に移動）</button>
-      </div>
-
-      <div id="formMainUI">
-        <div class="d-flex mb-3">
-          <div style="position:relative; width:90px; height:90px; margin-right:12px;">
-            <img id="previewImg" style="width:100%; height:100%; object-fit:contain; background:white; border-radius:10px;" referrerpolicy="no-referrer">
-            <div class="position-absolute bottom-0 start-0 w-100 d-flex justify-content-between px-1 pb-1">
-              <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
-              <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
-            </div>
-            <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
-          </div>
-          <div class="flex-grow-1">
-            <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
-            <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
-            <!-- ✅ サブカテゴリ復活（最小UI） -->
-            <select id="inputSubCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px; display:none;"></select>
-            <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
-          </div>
-        </div>
-
-        <div id="priceSection" class="mb-3 p-3 border rounded border-danger" style="background:#1a1a1a;">
-          <div id="calcOptionArea" class="d-flex align-items-center mb-2">
-            <div class="btn-group btn-group-sm w-100 me-2">
-              <input type="radio" class="btn-check" name="taxMode" id="taxEx" value="ex" checked>
-              <label class="btn btn-outline-danger" for="taxEx">税別</label>
-              <input type="radio" class="btn-check" name="taxMode" id="taxIn" value="in">
-              <label class="btn btn-outline-danger" for="taxIn">税込</label>
-            </div>
-            <div class="input-group input-group-sm w-50">
-              <input type="number" id="inputDisc" class="form-control bg-dark text-white border-secondary" placeholder="0">
-              <span class="input-group-text bg-dark text-secondary border-secondary">%引</span>
-            </div>
-          </div>
-          <input type="number" id="inputPrice" class="form-control text-end fw-bold text-danger border-0 bg-transparent fs-1" placeholder="0">
-        </div>
-
-        <div id="statsBox" class="stats-strip"></div>
-        <div id="detailHistory" class="mb-3" style="display:none;"></div>
-
-        <div class="text-center mb-3">
-          <button id="toggleHistBtn" class="btn btn-sm btn-outline-secondary w-100" onclick="toggleHistoryList()">購入履歴を表示（タップで編集）</button>
-        </div>
-
-        <div class="d-flex gap-2 mb-3">
-          <button id="delHistBtn" class="btn btn-outline-secondary py-3 fw-bold flex-grow-0 px-3 shadow" style="display:none;" onclick="confirmDeleteHist()">削除</button>
-          <button id="saveBtn" class="btn btn-danger py-3 fw-bold fs-5 shadow flex-grow-1" onclick="saveData()">保存</button>
+  <div class="container py-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div>
+        <div class="h5 mb-0">Smart Price</div>
+        <div class="muted" style="font-size:12px;">
+          <span id="buildInfo"></span>
         </div>
       </div>
+      <div class="d-flex gap-2">
+        <button id="btnSettings" class="btn btn-sm btn-outline-light"><i class="bi bi-gear"></i></button>
+        <button id="btnSync" class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat"></i> 同期</button>
+      </div>
+    </div>
 
-      <button class="btn btn-link text-secondary w-100" onclick="showHome()">戻る</button>
+    <!-- 入力 -->
+    <div class="card p-3 mb-3">
+      <div class="row g-2">
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">バーコード</label>
+          <input id="barcode" class="form-control" placeholder="例: 4901234567890">
+        </div>
+        <div class="col-12 col-md-8">
+          <label class="form-label mb-1">商品名</label>
+          <input id="name" class="form-control" placeholder="例: お茶 2L">
+        </div>
+
+        <div class="col-12 col-md-4">
+          <label class="form-label mb-1">メーカー</label>
+          <input id="maker" class="form-control" placeholder="例: ○○食品">
+        </div>
+
+        <div class="col-6 col-md-4">
+          <label class="form-label mb-1">店名</label>
+          <input id="store" class="form-control" placeholder="例: カスミ">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label mb-1">価格</label>
+          <input id="price" class="form-control" inputmode="numeric" placeholder="例: 198">
+        </div>
+        <div class="col-12 col-md-2">
+          <label class="form-label mb-1">日付</label>
+          <input id="date" class="form-control" type="date">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label mb-1">メモ</label>
+          <input id="note" class="form-control" placeholder="例: 特売・サイズ違い注意">
+        </div>
+
+        <!-- 画像 -->
+        <div class="col-12">
+          <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+              <img id="imgPreview" class="thumb" alt="">
+              <div class="muted" style="font-size:12px;">
+                <div class="line1" id="imgLabel">画像：未設定</div>
+                <div class="line2" id="imgHint">🔍は「検索一覧 → 戻ったらURL貼付」</div>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <label class="btn btn-sm btn-outline-light mb-0">
+                <i class="bi bi-image"></i> 画像を選ぶ
+                <input id="fileImage" type="file" accept="image/*" style="display:none;">
+              </label>
+              <button id="btnImageWeb" class="btn btn-sm btn-outline-light" title="ネット画像（URL）"><i class="bi bi-search"></i></button>
+              <button id="btnClearImage" class="btn btn-sm btn-outline-light" title="画像クリア"><i class="bi bi-x-circle"></i></button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 最新購入 -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="h6 mb-0">最新の購入</div>
+      <div class="muted" style="font-size:12px;"><span id="countInfo"></span></div>
+    </div>
+
+    <div id="list" class="d-grid gap-2 mb-3"></div>
+
+    <!-- 履歴 -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <div class="h6 mb-0">購入履歴</div>
+      <button id="btnExport" class="btn btn-sm btn-outline-light"><i class="bi bi-box-arrow-up-right"></i> 書き出し</button>
+    </div>
+    <div id="history" class="d-grid gap-2"></div>
+  </div>
+
+  <!-- 下バー -->
+  <div class="bottom-bar">
+    <div class="container d-flex gap-2">
+      <button id="btnSave" class="btn btn-primary w-50"><i class="bi bi-check2-circle"></i> 保存</button>
+      <button id="btnNew" class="btn btn-outline-light w-25"><i class="bi bi-plus-circle"></i> 新規</button>
+      <button id="btnDelete" class="btn btn-outline-light w-25"><i class="bi bi-trash3"></i> 削除</button>
     </div>
   </div>
-</div>
 
-<div id="camera-area">
-  <div id="interactive"></div>
-  <div class="scan-frame"><div class="laser"></div></div>
-  <button onclick="stopScanner()" class="btn btn-danger position-absolute top-0 end-0 m-4 fs-3 shadow-lg">×</button>
-</div>
+  <!-- トースト -->
+  <div class="toast-wrap" id="toastWrap" style="display:none;">
+    <div class="toast-msg" id="toastMsg"></div>
+  </div>
 
-<div id="dialogModal" class="modal">
-  <div class="modal-content text-center">
-    <h6 id="dialogTitle" class="text-secondary mb-3">Smart Price</h6>
-    <p id="dialogMsg" class="text-white mb-4"></p>
-    <div id="dialogInputArea" style="display:none;"><input type="text" id="dialogInput" class="form-control bg-dark text-white mb-3"></div>
-    <div class="d-flex gap-2">
-      <button id="dialogCancel" class="btn btn-dark flex-grow-1" style="display:none;">やめる</button>
-      <button id="dialogOk" class="btn btn-danger flex-grow-1">OK</button>
+  <!-- かんたんプロンプト -->
+  <div class="prompt-backdrop" id="promptBackdrop">
+    <div class="prompt-box">
+      <div class="prompt-title" id="promptTitle">入力</div>
+      <div class="prompt-text mb-2" id="promptText"></div>
+      <input class="form-control" id="promptInput" placeholder="">
+      <div class="prompt-actions">
+        <button class="btn btn-outline-light btn-sm" id="promptCancel">キャンセル</button>
+        <button class="btn btn-primary btn-sm" id="promptOk">OK</button>
+      </div>
     </div>
   </div>
-</div>
 
-<div id="settingsModal" class="modal">
-  <div class="modal-content">
-    <h5 class="text-white mb-4 text-center">設定</h5>
-
-    <div class="mb-3">
-      <label class="small text-secondary">生活圏（市）</label>
-      <input type="text" id="home-city-input" class="form-control bg-dark text-white border-secondary mb-1" placeholder="例：土浦市">
-      <div id="city-history-chips" class="city-chips"></div>
-    </div>
-
-    <div class="mb-3">
-      <label class="small text-secondary">Firebase URL</label>
-      <input type="text" id="fb-url-input" class="form-control bg-dark text-white border-secondary mb-3" placeholder="https://xxx.firebaseio.com/">
-    </div>
-
-    <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-2 shadow" onclick="startMigration()">設定保存と同期</button>
-    <button class="btn btn-outline-secondary w-100 py-2 fw-bold mb-2" onclick="openWebModal()">ブラウザ版へ（URL表示）</button>
-    <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
-  </div>
-</div>
-
-<div id="webModal" class="modal">
-  <div class="modal-content">
-    <h5 class="text-white mb-3 text-center">ブラウザ版（URL）</h5>
-    <div class="hint mb-3">
-      ・PWA（ホーム追加）だとアドレスが見えないので、ここでURLをコピーしてChrome/Edgeで開けます。<br>
-      ・更新確認は <b>まずブラウザで</b> 開くのが安全です。
-    </div>
-
-    <label class="small text-secondary">通常URL（コピーして開く）</label>
-    <textarea id="webUrlNormal" class="form-control bg-dark text-white border-secondary url-box mb-2" rows="2" readonly></textarea>
-    <div class="d-flex gap-2 mb-3">
-      <button class="btn btn-dark flex-grow-1" onclick="copyUrl('webUrlNormal')">コピー</button>
-      <button class="btn btn-danger flex-grow-1" onclick="openUrlFromBox('webUrlNormal')">開く</button>
-    </div>
-
-    <label class="small text-secondary">デバッグURL（&debug=1）</label>
-    <textarea id="webUrlDebug" class="form-control bg-dark text-white border-secondary url-box mb-2" rows="2" readonly></textarea>
-    <div class="d-flex gap-2 mb-3">
-      <button class="btn btn-dark flex-grow-1" onclick="copyUrl('webUrlDebug')">コピー</button>
-      <button class="btn btn-danger flex-grow-1" onclick="openUrlFromBox('webUrlDebug')">開く</button>
-    </div>
-
-    <button class="btn btn-link text-secondary w-100" onclick="closeWebModal()">戻る</button>
-  </div>
-</div>
-
-<div id="toast" class="toast-msg"></div>
-
-<script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  const APP_VERSION = "v19.9c-hf13-pwa2-snsimg1";
-  const BUILD_ID = "2026-01-03_2007_snsimg1";
+/* =========================
+   Build / Params
+========================= */
+const APP_VERSION = "v19.9c-hf13-pwa2-imgflow1";
+const BUILD_ID     = "2026-01-03_2155_imgflow1";
+const DEFAULT_BUILD = BUILD_ID;
 
-  // ========= bパラメータ（先祖帰り抑止：b無しだけ付与） =========
-  (function ensureBuildParamOnce(){
-    try {
-      const u = new URL(location.href);
-      if (!u.searchParams.get('b')) {
-        u.searchParams.set('b', BUILD_ID);
-        // debugは維持
-        location.replace(u.toString());
-      }
-    } catch(e){}
-  })();
+function getParam(name) {
+  try { return new URL(location.href).searchParams.get(name); } catch(e) { return null; }
+}
+function isDebug() { return getParam('debug') === '1'; }
 
-  // ========= PWA / Service Worker（更新強め） =========
-  (function setupServiceWorker(){
-    if (!('serviceWorker' in navigator)) return;
-    window.addEventListener('load', async () => {
-      try {
-        const reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
-        if (reg && reg.update) reg.update();
-      } catch(e) {
-        // 失敗してもアプリは動かす
-      }
-    });
-  })();
+function ensureBuildParamNoReload() {
+  // 黒画面になりやすい「強制リロード」をやめる（画面遷移なしで ?b を付与）
+  try {
+    const u = new URL(location.href);
+    if (!u.searchParams.get('b')) {
+      u.searchParams.set('b', DEFAULT_BUILD);
+      history.replaceState(null, "", u.toString());
+    }
+  } catch(e) {}
+}
 
-  // ========= Debug =========
-  function isDebug() {
-    try { return new URL(location.href).searchParams.get('debug') === '1'; } catch(e){ return false; }
-  }
+function setBuildUi() {
+  const b = getParam('b') || DEFAULT_BUILD;
+  document.getElementById('buildInfo').textContent = `${APP_VERSION} / BUILD ${b}`;
   if (isDebug()) {
-    window.addEventListener('error', (e) => {
-      showToast(`JSエラー: ${e.message}`, 10000);
-    });
-    window.addEventListener('unhandledrejection', (e) => {
-      const msg = (e && e.reason && e.reason.message) ? e.reason.message : String(e.reason || e);
-      showToast(`Promiseエラー: ${msg}`, 10000);
-    });
+    const el = document.getElementById('debugBadge');
+    el.style.display = 'block';
+    el.textContent = `DEBUG / ${APP_VERSION} / ${b}`;
   }
-
-  // ========= Category Tree =========
-  const DEFAULT_CATEGORY_TREE = {
-    "ドリンク": ["水・ミネラルウォーター","炭酸飲料","乳飲料","コーヒー","紅茶","お茶","スポーツドリンク","ジュース","粉末ドリンク","その他"],
-    "お酒": ["ビール","発泡酒","チョーハイ","日本酒","焼酎","ワイン","ウイスキー","梅酒","その他"],
-    "菓子・スナック": ["スナック","チョコ","ビスケット","キャンディ・ガム","和菓子","ナッツ","その他"],
-    "米・雑穀": ["白米","玄米","雑穀米","もち米","ご飯パック","餅","その他"],
-    "麺類・パスタ": ["ラーメン","うどん","そば","そうめん","焼きそば","パスタ","その他"],
-    "パン・ジャム・シリアル": ["パン","ジャム・はちみつ","シリアル","その他"],
-    "精肉・肉加工品": ["牛肉","豚肉","鶏肉","挽肉","加工品","セット","その他"],
-    "魚介類・水産加工品": ["マグロ","サケ","サバ","エビ","カニ","貝類","海藻類","魚卵","加工品","その他"],
-    "野菜・きのこ": ["葉物","根菜","果菜","きのこ","豆類","カット野菜","その他"],
-    "フルーツ・果物": ["柑橘","りんご系","ベリー","バナナ","ぶどう","その他"],
-    "乳製品・卵": ["牛乳","ヨーグルト","チーズ","バター・マーガリン","卵","代替品","その他"],
-    "豆腐・納豆・こんにゃく・練り物": ["豆腐","納豆","こんにゃく","練り物","その他"],
-    "漬物・佃煮": ["漬物","梅干し","キムチ","佃煮","その他"],
-    "冷凍食品": ["冷凍惣菜","冷凍麺","冷凍野菜","アイス","その他"],
-    "惣菜・チルド": ["和風惣菜","洋風惣菜","中華惣菜","韓国惣菜","その他"],
-    "レトルト・料理の素": ["カレー","スープ","丼","パスタソース","料理の素","その他"],
-    "缶詰・瓶詰": ["水産","肉","野菜","フルーツ","惣菜","その他"],
-    "乾物": ["海苔","鰹節","昆布","わかめ","春雨","その他"],
-    "粉類": ["小麦粉","片栗粉","パン粉","米粉","その他"],
-    "調味料・食用油・ドレッシング": ["砂糖","塩","酢","しょうゆ","みそ","だし","めんつゆ","ソース・たれ","ケチャップ","マヨネーズ","スパイス","油","ドレッシング","その他"],
-    "ベビーフード": ["離乳食","おやつ","その他"],
-    "健康食品": ["サプリ","プロテイン","その他"],
-    "介護用食品": ["やわらか食","とろみ","その他"],
-    "ミールキット": ["ミールキット","その他"],
-    "日用品": ["洗剤","キッチン用品","紙製品","衛生用品","その他"],
-    "薬": ["風邪","胃腸","痛み","外用","その他"],
-    "その他": ["その他"]
-  };
-
-  const DEFAULT_CONFIG = {
-    categories: [],
-    categoryTree: JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE)),
-    lastTax: "ex",
-    homeCity: "",
-    homeCities: [],
-    customStores: []
-  };
-
-  const CITY_STORE_PRESET = {
-    "土浦市": ["カスミ土浦駅前店", "カスミ ピアシティ荒川本郷店", "ヨークベニマル", "タイヨー", "まるも", "ウエルシア"],
-    "つくば市": ["カスミ つくば竹園店", "ヨークベニマル つくば竹園店", "ロピア つくば店", "タイヨー", "ウエルシア"],
-    "東海村": ["カスミ東海店", "ヨークベニマル東海店", "イオン東海店"]
-  };
-
-  // ========= Image Store (IndexedDB) =========
-  const IMG_DB_NAME = "smart_price_img_db_v1";
-  const IMG_STORE = "images";
-  let imgDbPromise = null;
-
-  function openImgDb() {
-    if (!('indexedDB' in window)) return Promise.resolve(null);
-    if (imgDbPromise) return imgDbPromise;
-    imgDbPromise = new Promise((resolve) => {
-      const req = indexedDB.open(IMG_DB_NAME, 1);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(IMG_STORE)) db.createObjectStore(IMG_STORE);
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => resolve(null);
-    });
-    return imgDbPromise;
-  }
-
-  async function idbPut(key, blob) {
-    const dbi = await openImgDb();
-    if (!dbi) return false;
-    return new Promise((res) => {
-      const tx = dbi.transaction(IMG_STORE, "readwrite");
-      tx.objectStore(IMG_STORE).put(blob, key);
-      tx.oncomplete = () => res(true);
-      tx.onerror = () => res(false);
-    });
-  }
-
-  async function idbGet(key) {
-    const dbi = await openImgDb();
-    if (!dbi) return null;
-    return new Promise((res) => {
-      const tx = dbi.transaction(IMG_STORE, "readonly");
-      const req = tx.objectStore(IMG_STORE).get(key);
-      req.onsuccess = () => res(req.result || null);
-      req.onerror = () => res(null);
-    });
-  }
-
-  function dataUrlToBlob(dataUrl) {
-    try {
-      const arr = dataUrl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8 = new Uint8Array(n);
-      while (n--) u8[n] = bstr.charCodeAt(n);
-      return new Blob([u8], { type: mime });
-    } catch(e){ return null; }
-  }
-
-  async function fileToThumbBlob(file, maxSide=256, quality=0.78) {
-    return new Promise((resolve) => {
-      const fr = new FileReader();
-      fr.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const w = img.width, h = img.height;
-          const scale = Math.min(1, maxSide / Math.max(w, h));
-          const cw = Math.max(1, Math.round(w * scale));
-          const ch = Math.max(1, Math.round(h * scale));
-          const canvas = document.createElement('canvas');
-          canvas.width = cw; canvas.height = ch;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = "#fff";
-          ctx.fillRect(0,0,cw,ch);
-          ctx.drawImage(img, 0,0,cw,ch);
-          canvas.toBlob((blob) => {
-            resolve(blob || null);
-          }, 'image/jpeg', quality);
-        };
-        img.onerror = () => resolve(null);
-        img.src = fr.result;
-      };
-      fr.onerror = () => resolve(null);
-      fr.readAsDataURL(file);
-    });
-  }
-
-  async function applyImageKeyToImg(imgEl, key) {
-    if (!imgEl || !key) return;
-    const blob = await idbGet(key);
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    imgEl.src = url;
-    if (imgEl.dataset && imgEl.dataset.objurl) {
-      try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
-    }
-    imgEl.dataset.objurl = url;
-  }
-
-  // ========= App State =========
-  let db = { products: {}, config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)) };
-  let curBarcode = null, curStore = "未設定";
-  let tempImgData = null; // {type:'key', key} or {type:'url', url}
-  let scanner = null, editingHistIdx = null, isScanning = false;
-
-  // ✅ ここは必ず let
-  let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || '';
-
-  let isGpsOn = false, curPos = null, lastGpsTime = "";
-  let activeSyncController = null;
-
-  // ========= util =========
-  function showToast(msg, ms = 4000) {
-    const t = document.getElementById('toast');
-    if (!t) return;
-    t.innerText = msg;
-    t.style.opacity = 1;
-    setTimeout(() => { t.style.opacity = 0; }, ms);
-  }
-
-  function isQuotaError(e) {
-    if (!e) return false;
-    return (
-      e.name === 'QuotaExceededError' ||
-      e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
-      e.code === 22 ||
-      e.code === 1014
-    );
-  }
-
-  function histTs(h) {
-    if (!h || typeof h !== "object") return 0;
-    const v = (h.ts ?? h.timestamp ?? h.time ?? 0);
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  function lastHistoryTs(p) {
-    try {
-      const h = (p && Array.isArray(p.history) && p.history.length) ? p.history[p.history.length-1] : null;
-      return histTs(h);
-    } catch(e){ return 0; }
-  }
-
-  function deepClone(x) {
-    try { return JSON.parse(JSON.stringify(x)); } catch(e){ return x; }
-  }
-
-  function normalizeDb(input) {
-    let o = (input && typeof input === "object") ? input : {};
-    if (!o.products || typeof o.products !== "object") o.products = {};
-    if (!o.config || typeof o.config !== "object") o.config = {};
-
-    if (!o.config.categoryTree || typeof o.config.categoryTree !== "object") {
-      if (Array.isArray(o.config.categories) && o.config.categories.length) {
-        const tree = {};
-        o.config.categories.forEach(c => { tree[c] = ["その他"]; });
-        o.config.categoryTree = tree;
-      } else {
-        o.config.categoryTree = JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE));
-      }
-    }
-    o.config.categories = Object.keys(o.config.categoryTree);
-
-    if (typeof o.config.lastTax !== "string") o.config.lastTax = DEFAULT_CONFIG.lastTax;
-    if (typeof o.config.homeCity !== "string") o.config.homeCity = DEFAULT_CONFIG.homeCity;
-    if (!Array.isArray(o.config.homeCities)) o.config.homeCities = o.config.homeCity ? [o.config.homeCity] : [];
-    if (!Array.isArray(o.config.customStores)) o.config.customStores = [];
-
-    Object.keys(o.products).forEach(code => {
-      const p = o.products[code];
-      if (!p || typeof p !== 'object') return;
-      if (!Array.isArray(p.history)) p.history = [];
-      if (typeof p.image === 'string' && (p.image.startsWith('http://') || p.image.startsWith('https://'))) {
-        p.imageUrl = p.image;
-        delete p.image;
-      }
-    });
-
-    if (o.config.homeCity) {
-      o.config.homeCities = [o.config.homeCity, ...o.config.homeCities.filter(c => c !== o.config.homeCity)].slice(0, 5);
-    }
-
-    o.config.customStores = (o.config.customStores || [])
-      .filter(s => typeof s === "string" && s.trim())
-      .map(s => s.trim());
-    o.config.customStores = [...new Set(o.config.customStores)].slice(0, 20);
-
-    return o;
-  }
-
-  function makeSlimDb(d) {
-    const out = JSON.parse(JSON.stringify(d));
-    Object.keys(out.products || {}).forEach(k => {
-      const p = out.products[k];
-      if (!p) return;
-      if (typeof p.image === "string" && p.image.startsWith("data:")) delete p.image;
-      if (typeof p.imageUrl === "string" && p.imageUrl.startsWith("data:")) delete p.imageUrl;
-      if (Array.isArray(p.history) && p.history.length > 500) p.history = p.history.slice(-500);
-    });
-    return normalizeDb(out);
-  }
-
-  function stripForCloud(d) {
-    const out = JSON.parse(JSON.stringify(d));
-    Object.keys(out.products || {}).forEach(k => {
-      const p = out.products[k];
-      if (!p) return;
-      delete p.image;
-      delete p.imageKey; // 端末内のみ
-      if (typeof p.imageUrl === "string" && p.imageUrl.startsWith("data:")) delete p.imageUrl;
-    });
-    return out;
-  }
-
-  function saveLocalOnly() {
-    try {
-      localStorage.setItem('smart_price_db', JSON.stringify(db));
-      return true;
-    } catch (e) {
-      if (!isQuotaError(e)) {
-        showToast("端末保存に失敗しました", 10000);
-        return false;
-      }
-      const slim = makeSlimDb(db);
-      try {
-        localStorage.setItem('smart_price_db', JSON.stringify(slim));
-        db = slim;
-        showToast("端末容量が厳しいので軽量保存に切替えました", 8000);
-        return true;
-      } catch (e2) {
-        try {
-          localStorage.removeItem('smart_price_db');
-          localStorage.setItem('smart_price_db', JSON.stringify(slim));
-          db = slim;
-          showToast("端末容量を整理して復旧しました", 8000);
-          return true;
-        } catch (e3) {
-          showToast("端末保存が完全に失敗しました（容量不足）", 10000);
-          return false;
-        }
-      }
-    }
-  }
-
-  function loadLocal() {
-    try {
-      const saved = localStorage.getItem('smart_price_db');
-      if (saved) db = JSON.parse(saved);
-      db = normalizeDb(db);
-      const taxModeId = db.config.lastTax === "in" ? 'taxIn' : 'taxEx';
-      const el = document.getElementById(taxModeId);
-      if (el) el.checked = true;
-    } catch(e) {
-      db = normalizeDb({});
-      showToast("ローカル読込に失敗（クラウド同期で復旧します）", 8000);
-    }
-  }
-
-  // ========= fetch timeout（signalがあってもタイムアウト効かせる） =========
-  async function fetchWithTimeout(resource, options = {}, timeout = 12000) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      try { controller.abort(); } catch(e){}
-    }, timeout);
-
-    // 外からのabortも受ける
-    if (options.signal) {
-      if (options.signal.aborted) {
-        try { controller.abort(); } catch(e){}
-      } else {
-        try {
-          options.signal.addEventListener('abort', () => {
-            try { controller.abort(); } catch(e){}
-          }, { once:true });
-        } catch(e){}
-      }
-    }
-
-    try {
-      const response = await fetch(resource, { cache: 'no-store', ...options, signal: controller.signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  // ========= SNS画像：URL→代表画像抽出→共有サムネURL化 =========
-  function looksDirectImageUrl(u) {
-    try {
-      const U = new URL(u);
-      const p = (U.pathname || '').toLowerCase();
-      if (/\.(jpg|jpeg|png|webp|gif|bmp|svg)$/i.test(p)) return true;
-      // よくある画像CDN
-      if (U.hostname.includes('m.media-amazon.com') || U.hostname.includes('images-na.ssl-images-amazon.com')) return true;
-      return false;
-    } catch(e){ return false; }
-  }
-
-  function tryExtractImageUrlFromQuery(u) {
-    try {
-      const U = new URL(u);
-      const keys = ['imgurl','mediaurl','image','imageurl','photo','src'];
-      for (const k of keys) {
-        const v = U.searchParams.get(k);
-        if (v && /^https?:\/\//i.test(v)) return v;
-      }
-      // Google画像のよくある形（?imgurl= が入ってるやつ）
-      const all = U.searchParams.toString();
-      if (all.includes('imgurl=')) {
-        const v = U.searchParams.get('imgurl');
-        if (v && /^https?:\/\//i.test(v)) return v;
-      }
-      return null;
-    } catch(e){ return null; }
-  }
-
-  function pickMetaContent(html, key) {
-    try {
-      const re1 = new RegExp(`(?:property|name)=["']${key}["'][^>]*content=["']([^"']+)["']`, 'i');
-      const m1 = html.match(re1);
-      if (m1 && m1[1]) return m1[1];
-
-      const re2 = new RegExp(`content=["']([^"']+)["'][^>]*(?:property|name)=["']${key}["']`, 'i');
-      const m2 = html.match(re2);
-      if (m2 && m2[1]) return m2[1];
-
-      return null;
-    } catch(e){ return null; }
-  }
-
-  function makeJinaUrl(pageUrl) {
-    // r.jina.ai は「https://r.jina.ai/https://example.com/...」形式
-    return `https://r.jina.ai/${pageUrl}`;
-  }
-
-  function stripProtocol(url) {
-    return String(url || '').replace(/^https?:\/\//i, '');
-  }
-
-  function makeSharedThumbUrl(originalImgUrl, size=256) {
-    // wsrv（images.weserv.nl）で“共有サムネURL”化（CORS/直リンク拒否を回避しやすい）
-    const clean = stripProtocol(originalImgUrl);
-    // cb=BUILD_ID は“更新確認”がしやすいように軽くキャッシュ回避
-    return `https://images.weserv.nl/?url=${encodeURIComponent(clean)}&w=${size}&h=${size}&fit=contain&output=jpg&cb=${encodeURIComponent(BUILD_ID)}`;
-  }
-
-  async function resolveRepresentativeImageUrl(inputUrl) {
-    const u = (inputUrl || '').trim();
-    if (!/^https?:\/\//i.test(u)) return null;
-
-    // 1) まず、長いリンクの中に imgurl 等が含まれていたらそれを優先
-    const fromQ = tryExtractImageUrlFromQuery(u);
-    if (fromQ && looksDirectImageUrl(fromQ)) return fromQ;
-    if (fromQ && /^https?:\/\//i.test(fromQ)) return fromQ;
-
-    // 2) 直画像URLならそのまま
-    if (looksDirectImageUrl(u)) return u;
-
-    // 3) 商品ページなど：og:image / twitter:image を拾う（CORS回避のため r.jina.ai 経由）
-    try {
-      const jina = makeJinaUrl(u);
-      const txt = await (await fetchWithTimeout(jina, {}, 12000)).text();
-
-      let img = pickMetaContent(txt, 'og:image')
-             || pickMetaContent(txt, 'twitter:image')
-             || pickMetaContent(txt, 'twitter:image:src');
-
-      // 予備：image_src
-      if (!img) {
-        const m = txt.match(/rel=["']image_src["'][^>]*href=["']([^"']+)["']/i) || txt.match(/href=["']([^"']+)["'][^>]*rel=["']image_src["']/i);
-        if (m && m[1]) img = m[1];
-      }
-
-      if (img) {
-        // 相対URL対策
-        const abs = new URL(img, u).toString();
-        return abs;
-      }
-
-      // 最後の手段：本文からそれっぽい画像URLを拾う（当たり外れあり）
-      const m2 = txt.match(/https?:\/\/[^"'\s<>]+?\.(jpg|jpeg|png|webp)(\?[^"'\s<>]+)?/i);
-      if (m2 && m2[0]) return m2[0];
-
-      return null;
-    } catch(e) {
-      return null;
-    }
-  }
-
-  function getBaseUrl(url) {
-    if(!url) return "";
-    let base = url.trim().replace(/\/rules$/, "").replace(/\/+$/, "");
-    if(base.endsWith('.json')) base = base.slice(0, -5);
-    if(base.endsWith('/smart_price') || base.endsWith('smart_price')) base = base.replace(/\/?smart_price$/, '');
-    return base.replace(/\/+$/, '');
-  }
-  function getSafeUrl(url) {
-    const base = getBaseUrl(url);
-    return base ? `${base}/smart_price.json` : "";
-  }
-
-  // ========= DB merge（クラウド上書き禁止） =========
-  function mergeHistory(localH, cloudH) {
-    const a = Array.isArray(localH) ? localH : [];
-    const b = Array.isArray(cloudH) ? cloudH : [];
-    const map = new Map();
-
-    function put(h){
-      if (!h || typeof h !== 'object') return;
-      const ts = histTs(h);
-      const price = Number(h.price);
-      const store = String(h.store || '');
-      const key = `${ts}|${price}|${store}`;
-      if (!map.has(key)) map.set(key, h);
-    }
-    a.forEach(put);
-    b.forEach(put);
-
-    const out = Array.from(map.values()).sort((x,y) => histTs(x) - histTs(y));
-    return out.length > 500 ? out.slice(-500) : out;
-  }
-
-  function mergeProduct(localP, cloudP) {
-    const lp = (localP && typeof localP === 'object') ? localP : { history: [] };
-    const cp = (cloudP && typeof cloudP === 'object') ? cloudP : { history: [] };
-
-    const lts = lastHistoryTs(lp);
-    const cts = lastHistoryTs(cp);
-
-    // 新しい履歴を持つ側を“本体”に
-    const base = deepClone((lts >= cts) ? lp : cp);
-    const other = deepClone((lts >= cts) ? cp : lp);
-
-    // historyは必ずマージ
-    base.history = mergeHistory(lp.history, cp.history);
-
-    // 文字系：空なら補完
-    const fields = ['name','maker','category','subCategory','imageUrl'];
-    fields.forEach(k => {
-      if ((!base[k] || String(base[k]).trim() === '') && other[k]) base[k] = other[k];
-    });
-
-    // 端末内画像キー：ローカルを最優先で保持
-    if (lp.imageKey) base.imageKey = lp.imageKey;
-    // 旧imageは整理
-    if (typeof base.image === 'string' && base.image.startsWith('data:')) delete base.image;
-    if (typeof base.imageUrl === 'string' && base.imageUrl.startsWith('data:')) delete base.imageUrl;
-
-    if (!Array.isArray(base.history)) base.history = [];
-    return base;
-  }
-
-  function mergeConfig(localC, cloudC) {
-    const lc = (localC && typeof localC === 'object') ? deepClone(localC) : {};
-    const cc = (cloudC && typeof cloudC === 'object') ? deepClone(cloudC) : {};
-
-    // 基本はクラウド優先（端末間で揃いやすい）
-    const out = deepClone(cc);
-
-    // ただし空はローカルで補完
-    if (!out.homeCity && lc.homeCity) out.homeCity = lc.homeCity;
-    if (!out.lastTax && lc.lastTax) out.lastTax = lc.lastTax;
-
-    // homeCities/customStoresはユニオン
-    const hc = [...new Set([...(Array.isArray(out.homeCities)?out.homeCities:[]), ...(Array.isArray(lc.homeCities)?lc.homeCities:[])])].filter(Boolean).slice(0,5);
-    out.homeCities = hc;
-    const cs = [...new Set([...(Array.isArray(out.customStores)?out.customStores:[]), ...(Array.isArray(lc.customStores)?lc.customStores:[])])].filter(Boolean).slice(0,20);
-    out.customStores = cs;
-
-    // categoryTreeは“欠けを補う”
-    if (!out.categoryTree || typeof out.categoryTree !== 'object') out.categoryTree = {};
-    const ltree = (lc.categoryTree && typeof lc.categoryTree === 'object') ? lc.categoryTree : {};
-    Object.keys(ltree).forEach(cat => {
-      if (!out.categoryTree[cat]) out.categoryTree[cat] = deepClone(ltree[cat]);
-      else {
-        // サブカテゴリを補完
-        const a = Array.isArray(out.categoryTree[cat]) ? out.categoryTree[cat] : [];
-        const b = Array.isArray(ltree[cat]) ? ltree[cat] : [];
-        out.categoryTree[cat] = [...new Set([...a,...b])];
-      }
-    });
-
-    return out;
-  }
-
-  function mergeDb(localDb, cloudDb) {
-    const ld = normalizeDb(deepClone(localDb || {}));
-    const cd = normalizeDb(deepClone(cloudDb || {}));
-
-    const merged = { products:{}, config:{} };
-    const keys = new Set([...Object.keys(ld.products||{}), ...Object.keys(cd.products||{})]);
-
-    keys.forEach(code => {
-      merged.products[code] = mergeProduct(ld.products[code], cd.products[code]);
-    });
-    merged.config = mergeConfig(ld.config, cd.config);
-    return normalizeDb(merged);
-  }
-
-  async function syncFirebasePut() {
-    if(!fbUrl) return;
-    try {
-      const targetUrl = getSafeUrl(fbUrl);
-      const payload = stripForCloud(db);
-      await fetchWithTimeout(targetUrl, {
-        method: 'PUT',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      }, 12000);
-    } catch(e){
-      if (isDebug()) showToast(`PUT失敗: ${e.message}`, 8000);
-    }
-  }
-
-  async function syncFirebase() {
-    if(!fbUrl) return;
-    try {
-      const targetUrl = getSafeUrl(fbUrl);
-      const res = await fetchWithTimeout(targetUrl, {}, 12000);
-      const cloud = await res.json();
-      if (cloud && cloud.products) {
-        // ✅ ここが本命：上書き禁止でマージ
-        db = mergeDb(db, cloud);
-        saveLocalOnly();
-        initCategorySelect();
-        renderHistory();
-        renderStoreList();
-      }
-    } catch(e){
-      if (isDebug()) showToast(`GET失敗: ${e.message}`, 8000);
-    }
-  }
-
-  // ✅ 旧 data:image が端末に残っている場合のみ復活できる
-  async function migrateLegacyImagesToIdb() {
-    const dbi = await openImgDb();
-    if (!dbi) return;
-
-    let changed = false;
-    const keys = Object.keys(db.products || {});
-    for (const code of keys) {
-      const p = db.products[code];
-      if (!p) continue;
-
-      if (typeof p.image === 'string' && p.image.startsWith('data:') && !p.imageKey) {
-        const blob = dataUrlToBlob(p.image);
-        if (blob) {
-          const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-          const ok = await idbPut(key, blob);
-          if (ok) {
-            p.imageKey = key;
-            delete p.image;
-            changed = true;
-          }
-        }
-      }
-
-      if (typeof p.image === 'string' && (p.image.startsWith('http://') || p.image.startsWith('https://'))) {
-        p.imageUrl = p.image;
-        delete p.image;
-        changed = true;
-      }
-    }
-
-    if (changed) {
-      saveLocalOnly();
-      syncFirebasePut();
-      if (isDebug()) showToast("旧画像を端末内へ移行しました", 5000);
-    }
-  }
-
-  window.onload = async () => {
-    loadLocal();
-    db = normalizeDb(db);
-
-    await migrateLegacyImagesToIdb();
-
-    initCategorySelect();
-    renderStoreList();
-    renderHistory();
-
-    if (fbUrl) {
-      await syncFirebase(); // ✅ マージ方式に変わったので画像が消えない
-      renderHistory();
-      renderStoreList();
-    }
-
-    setupFocusGuides();
-
-    if (isDebug()) {
-      setTimeout(() => {
-        showToast(`DEBUG:${APP_VERSION} / ${BUILD_ID}`, 4000);
-      }, 300);
-    }
-  };
-
-  window.addEventListener("pageshow", resetSyncBtn);
-  window.addEventListener("beforeunload", resetSyncBtn);
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      resetSyncBtn();
-      if (activeSyncController) activeSyncController.abort();
-    }
+  // manifestにbを付与（キャッシュ回避）
+  const ml = document.getElementById('manifestLink');
+  if (ml) ml.href = `manifest.json?b=${encodeURIComponent(b)}`;
+}
+
+/* =========================
+   Toast
+========================= */
+let toastTimer = null;
+function showToast(msg, ms=4500) {
+  const wrap = document.getElementById('toastWrap');
+  const box = document.getElementById('toastMsg');
+  box.textContent = msg;
+  wrap.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ wrap.style.display = 'none'; }, ms);
+}
+
+/* =========================
+   Simple Prompt
+========================= */
+let promptResolve = null;
+function customPrompt(title, text, initialValue="") {
+  const bd = document.getElementById('promptBackdrop');
+  const t  = document.getElementById('promptTitle');
+  const tx = document.getElementById('promptText');
+  const ip = document.getElementById('promptInput');
+  t.textContent = title || "入力";
+  tx.textContent = text || "";
+  ip.value = initialValue || "";
+  bd.style.display = "flex";
+  ip.focus();
+  ip.select();
+
+  return new Promise((resolve) => {
+    promptResolve = resolve;
   });
+}
+function closePrompt(val) {
+  const bd = document.getElementById('promptBackdrop');
+  bd.style.display = "none";
+  const r = promptResolve;
+  promptResolve = null;
+  if (r) r(val);
+}
+document.getElementById('promptOk').addEventListener('click', ()=> closePrompt(document.getElementById('promptInput').value));
+document.getElementById('promptCancel').addEventListener('click', ()=> closePrompt(null));
+document.getElementById('promptInput').addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') closePrompt(document.getElementById('promptInput').value);
+  if (e.key === 'Escape') closePrompt(null);
+});
 
-  function resetSyncBtn() {
-    const btn = document.getElementById('syncBtn');
-    if (btn) {
-      btn.disabled = false;
-      btn.innerText = "設定保存と同期";
-    }
-  }
+/* =========================
+   IndexedDB for images
+========================= */
+const IMG_DB_NAME = "SmartPriceImages";
+const IMG_STORE   = "images";
+let imgDbPromise = null;
+const memImgCache = new Map();
 
-  // ========= Category UI =========
-  function initCategorySelect() {
-    db = normalizeDb(db);
-    const sel = document.getElementById('inputCategory');
-    const sub = document.getElementById('inputSubCategory');
-    if(!sel) return;
-
-    const cats = Object.keys(db.config.categoryTree || {});
-    sel.innerHTML = `<option value="__NONE__">カテゴリを選ぶ</option>` +
-      cats.map(c => `<option value="${c}">${c}</option>`).join('') +
-      `<option value="ADD">+ 追記</option>`;
-
-    sel.onchange = async () => {
-      if(sel.value === "ADD") {
-        const n = await customPrompt("新しいカテゴリ名");
-        if(n && n.trim()) {
-          const name = n.trim();
-          if (!db.config.categoryTree[name]) db.config.categoryTree[name] = ["その他"];
-          db.config.categories = Object.keys(db.config.categoryTree);
-          initCategorySelect();
-          sel.value = name;
-          initSubCategorySelect(name);
-          saveLocalOnly(); syncFirebasePut();
-        } else {
-          sel.selectedIndex = 0;
-          if (sub) sub.style.display = 'none';
-        }
-        return;
-      }
-      initSubCategorySelect(sel.value);
-    };
-
-    if (sub) sub.style.display = 'none';
-  }
-
-  function initSubCategorySelect(cat) {
-    const sub = document.getElementById('inputSubCategory');
-    if (!sub) return;
-    if (!cat || cat === "__NONE__") { sub.style.display = 'none'; return; }
-
-    db = normalizeDb(db);
-    let list = (db.config.categoryTree && db.config.categoryTree[cat]) ? db.config.categoryTree[cat] : [];
-    if (!Array.isArray(list)) list = [];
-    if (!list.includes("その他")) list = [...list, "その他"];
-
-    sub.style.display = 'block';
-    sub.innerHTML = `<option value="__NONE__">サブカテゴリを選ぶ</option>` +
-      list.map(s => `<option value="${s}">${s}</option>`).join('') +
-      `<option value="ADD_SUB">+ 追記</option>`;
-
-    sub.onchange = async () => {
-      if (sub.value === "ADD_SUB") {
-        const n = await customPrompt("新しいサブカテゴリ名");
-        if (n && n.trim()) {
-          const name = n.trim();
-          if (!db.config.categoryTree[cat]) db.config.categoryTree[cat] = [];
-          if (!db.config.categoryTree[cat].includes(name)) db.config.categoryTree[cat].push(name);
-          if (!db.config.categoryTree[cat].includes("その他")) db.config.categoryTree[cat].push("その他");
-          initSubCategorySelect(cat);
-          sub.value = name;
-          saveLocalOnly(); syncFirebasePut();
-        } else {
-          sub.selectedIndex = 0;
-        }
+function openImgDb() {
+  if (imgDbPromise) return imgDbPromise;
+  imgDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(IMG_DB_NAME, 1);
+    req.onupgradeneeded = (ev) => {
+      const db = ev.target.result;
+      if (!db.objectStoreNames.contains(IMG_STORE)) {
+        db.createObjectStore(IMG_STORE, { keyPath: "key" });
       }
     };
-  }
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return imgDbPromise;
+}
+function idbPutImage(dataUrl) {
+  return new Promise(async (resolve, reject) => {
+    const db = await openImgDb();
+    const tx = db.transaction(IMG_STORE, "readwrite");
+    const st = tx.objectStore(IMG_STORE);
+    const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    st.put({ key, dataUrl, ts: Date.now() });
+    tx.oncomplete = ()=> resolve(key);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+function idbGetImage(key) {
+  if (!key) return Promise.resolve(null);
+  if (memImgCache.has(key)) return Promise.resolve(memImgCache.get(key));
+  return new Promise(async (resolve, reject) => {
+    const db = await openImgDb();
+    const tx = db.transaction(IMG_STORE, "readonly");
+    const st = tx.objectStore(IMG_STORE);
+    const rq = st.get(key);
+    rq.onsuccess = ()=> {
+      const rec = rq.result;
+      const v = rec ? rec.dataUrl : null;
+      if (v) memImgCache.set(key, v);
+      resolve(v);
+    };
+    rq.onerror = ()=> reject(rq.error);
+  });
+}
+function idbDelImage(key) {
+  if (!key) return Promise.resolve();
+  memImgCache.delete(key);
+  return new Promise(async (resolve, reject) => {
+    const db = await openImgDb();
+    const tx = db.transaction(IMG_STORE, "readwrite");
+    tx.objectStore(IMG_STORE).delete(key);
+    tx.oncomplete = ()=> resolve();
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
 
-  // ========= Stores =========
-  function addCustomStore(name) {
-    db = normalizeDb(db);
-    const s = (name || "").trim();
-    if (!s) return;
-    db.config.customStores = [s, ...(db.config.customStores || []).filter(x => x !== s)].slice(0, 20);
-    saveLocalOnly();
-    syncFirebasePut();
-  }
+/* =========================
+   Image helpers
+========================= */
+async function fileToResizedDataUrl(file, maxSide=900, quality=0.82) {
+  const img = new Image();
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = ()=> resolve(fr.result);
+    fr.onerror = ()=> reject(fr.error);
+    fr.readAsDataURL(file);
+  });
+  img.src = dataUrl;
+  await new Promise((res)=> img.onload = res);
 
-  async function promptAddStore() {
-    const n = await customPrompt("店名を手入力（例：○○スーパー）");
-    if(n && n.trim()) {
-      const s = n.trim();
-      addCustomStore(s);
-      curStore = s;
-      const ind = document.getElementById('curStoreIndicator');
-      if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
-      renderStoreList();
-      showToast("店名を追加しました", 3000);
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  let nw = w, nh = h;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  nw = Math.round(w * scale); nh = Math.round(h * scale);
+
+  const cv = document.createElement('canvas');
+  cv.width = nw; cv.height = nh;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(img, 0, 0, nw, nh);
+
+  // JPEGで軽く（黒背景アプリの相性も良い）
+  return cv.toDataURL('image/jpeg', quality);
+}
+
+function looksLikeDirectImageUrl(url) {
+  try {
+    const u = new URL(url);
+    const p = (u.pathname || "").toLowerCase();
+    return /\.(png|jpg|jpeg|webp|gif|bmp|avif)$/.test(p);
+  } catch(e) { return false; }
+}
+
+function extractImgUrlFromGoogle(url) {
+  // 例: https://www.google.com/imgres?imgurl=...&imgrefurl=...
+  try {
+    const u = new URL(url);
+    const p = u.searchParams;
+    const imgurl = p.get('imgurl') || p.get('mediaurl') || p.get('imgrefurl');
+    if (imgurl) return decodeURIComponent(imgurl);
+  } catch(e) {}
+  return null;
+}
+
+function normalizeImageUrl(input) {
+  if (!input) return null;
+  let s = String(input).trim();
+
+  // 先頭/末尾の引用符を除去
+  s = s.replace(/^["'`]+/, '').replace(/["'`]+$/, '');
+
+  // Google画像の長いURLから抽出
+  const extracted = extractImgUrlFromGoogle(s);
+  if (extracted) s = extracted.trim();
+
+  // たまに末尾に余計な文字が付くのを軽く除去
+  s = s.replace(/\s/g, '');
+
+  // URLとして成立するか確認
+  try { new URL(s); } catch(e) { return null; }
+  return s;
+}
+
+async function tryResolveOgImage(pageUrl) {
+  // 画像URLでなければ、ページURLから og:image / twitter:image を拾えたら拾う
+  // 直接fetchはCORSで落ちやすい → r.jina.ai を経由（取れない時は諦めてpageUrlのまま）
+  try {
+    const u = new URL(pageUrl);
+    const proxy = "https://r.jina.ai/" + u.href; // 例: https://r.jina.ai/https://example.com/...
+    const res = await fetch(proxy, { cache: "no-store" });
+    if (!res.ok) return pageUrl;
+    const txt = await res.text();
+
+    const pick = (re) => {
+      const m = txt.match(re);
+      if (!m) return null;
+      return (m[1] || "").trim();
+    };
+
+    let img = null;
+    img = img || pick(/property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+    img = img || pick(/name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+    img = img || pick(/name=["']twitter:image:src["'][^>]*content=["']([^"']+)["']/i);
+
+    if (!img) return pageUrl;
+
+    // 相対URLを絶対に
+    try { img = new URL(img, u.origin).href; } catch(e) {}
+    return img;
+  } catch(e) {
+    return pageUrl;
+  }
+}
+
+/* =========================
+   Data model
+========================= */
+const LS_KEY = "SMART_PRICE_DB_V3";
+
+let db = null;
+let currentBarcode = "";
+let tempImg = { type: "none" }; // {type:'db', key} or {type:'url', url} or none
+let pendingImageSearch = null;  // {barcode,name,ts}
+
+function nowDateStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function yen(n) {
+  const x = Number(n || 0);
+  if (!isFinite(x)) return "";
+  return x.toLocaleString('ja-JP');
+}
+
+function defaultDb() {
+  return {
+    v: 3,
+    updatedAt: Date.now(),
+    settings: {
+      firebaseUrl: "", // 例: https://xxxx-default-rtdb.firebaseio.com/smartprice.json
+      deviceName: "",
+      lastSyncAt: 0
+    },
+    products: {},   // barcode -> {barcode,name,maker,note,imageKey,imageUrl,last:{...}}
+    purchases: []   // {id, ts, barcode, date, store, price, note, imageKey,imageUrl}
+  };
+}
+
+function loadDb() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    db = raw ? JSON.parse(raw) : defaultDb();
+  } catch(e) {
+    db = defaultDb();
+  }
+  normalizeDb();
+}
+
+function makeSlimDbForStorage(obj) {
+  // 画像データは持たない（key/urlだけ）
+  const slim = JSON.parse(JSON.stringify(obj || defaultDb()));
+  slim.updatedAt = Date.now();
+  // purchasesに巨大データが混ざらないよう保険
+  for (const p of slim.purchases) {
+    delete p.imageData;
+  }
+  return slim;
+}
+
+function saveDb() {
+  db.updatedAt = Date.now();
+  const slim = makeSlimDbForStorage(db);
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(slim));
+  } catch(e) {
+    // 容量が厳しいときは履歴を古い順に削って救う
+    try {
+      showToast("保存容量が厳しいので、古い履歴から間引きます…", 6000);
+      while (slim.purchases.length > 50) slim.purchases.shift();
+      localStorage.setItem(LS_KEY, JSON.stringify(slim));
+      db = slim;
+    } catch(e2) {
+      showToast("保存に失敗しました（容量）。画像URL運用がおすすめです。", 8000);
     }
   }
+}
 
-  function renderStoreList(manualPriority = []) {
-    db = normalizeDb(db);
-    const list = document.getElementById('store-list');
-    if(!list) return;
+function normalizeDb() {
+  if (!db || typeof db !== "object") db = defaultDb();
+  if (!db.v) db.v = 3;
+  if (!db.settings) db.settings = defaultDb().settings;
+  if (!db.products) db.products = {};
+  if (!Array.isArray(db.purchases)) db.purchases = [];
+}
 
-    const freq = {};
-    Object.values(db.products).forEach(p => p.history?.forEach(h => {
-      if(!h.store || h.store === "未設定") return;
-      freq[h.store] = (freq[h.store] || 0) + 1;
-    }));
-    const sortedFreq = Object.keys(freq).sort((a,b) => freq[b] - freq[a]);
-    const cityStores = CITY_STORE_PRESET[db.config.homeCity] || [];
-    const customStores = db.config.customStores || [];
-    const finalSet = ["未設定", ...new Set([...manualPriority, ...customStores, ...cityStores, ...sortedFreq])];
+/* =========================
+   UI helpers
+========================= */
+const $ = (id)=> document.getElementById(id);
 
-    const gpsTxt = isGpsOn ? `GPS<span class="gps-status">●${lastGpsTime}</span>` : `GPS<span class="gps-status">OFF</span>`;
-    list.innerHTML = `<span class="store-tag gps-btn ${isGpsOn?'on':''}" onclick="toggleGps()">${gpsTxt}</span>`;
+function clearForm() {
+  $("barcode").value = "";
+  $("name").value = "";
+  $("maker").value = "";
+  $("store").value = "";
+  $("price").value = "";
+  $("date").value = nowDateStr();
+  $("note").value = "";
+  tempImg = { type: "none" };
+  currentBarcode = "";
+  updateImgPreview();
+}
 
-    finalSet.forEach(name => {
-      const span = document.createElement('span');
-      span.className = 'store-tag' + (name === curStore ? ' active' : '');
-      span.innerText = name;
-      span.onclick = () => {
-        document.querySelectorAll('.store-tag').forEach(s => s.classList.remove('active'));
-        span.classList.add('active');
-        curStore = name;
-        const ind = document.getElementById('curStoreIndicator');
-        if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
-      };
-      list.appendChild(span);
-    });
+function setFormFromProduct(barcode) {
+  const pr = db.products[barcode];
+  if (!pr) return;
+  currentBarcode = barcode;
+  $("barcode").value = pr.barcode || barcode;
+  $("name").value = pr.name || "";
+  $("maker").value = pr.maker || "";
+  $("note").value = pr.note || "";
+  // 最終購入があればそれを入れる
+  const last = pr.last || {};
+  $("store").value = last.store || "";
+  $("price").value = last.price != null ? String(last.price) : "";
+  $("date").value = last.date || nowDateStr();
 
-    const addBtn = document.createElement('span');
-    addBtn.className = 'store-tag add-store';
-    addBtn.innerText = '＋店名入力';
-    addBtn.onclick = () => promptAddStore();
-    list.appendChild(addBtn);
-  }
+  // 画像は「編集用」に一旦セット
+  if (pr.imageKey) tempImg = { type: "db", key: pr.imageKey };
+  else if (pr.imageUrl) tempImg = { type: "url", url: pr.imageUrl };
+  else tempImg = { type: "none" };
+  updateImgPreview();
+}
 
-  // ========= Home History =========
-  function placeholderImg() {
-    return 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage';
-  }
+async function updateImgPreview() {
+  const img = $("imgPreview");
+  const label = $("imgLabel");
 
-  function renderHistory() {
-    const list = document.getElementById('historyList');
-    if(!list) return;
-    list.innerHTML = "";
-
-    const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
-    items.sort((a,b) => (histTs(b.history?.[b.history.length-1]) || 0) - (histTs(a.history?.[a.history.length-1]) || 0));
-
-    items.forEach(it => {
-      if (!it.history || !it.history.length) return;
-      const last = it.history[it.history.length-1];
-      const div = document.createElement('div');
-      div.className = 'card price-card';
-      div.onclick = () => openForm(it.code);
-
-      const imgId = `img_${it.code.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
-      const imgSrc = (it.imageUrl && (it.imageUrl.startsWith('http://') || it.imageUrl.startsWith('https://'))) ? it.imageUrl : placeholderImg();
-
-      div.innerHTML = `
-        <div class="d-flex align-items-center">
-          <img id="${imgId}" src="${imgSrc}" class="prod-thumb" referrerpolicy="no-referrer">
-          <div class="flex-grow-1 overflow-hidden">
-            <div class="fw-bold text-white small text-truncate">${it.name || ''}</div>
-            <div class="text-secondary" style="font-size:0.6rem;">${last.store || '未設定'}</div>
-          </div>
-          <div class="text-end ms-2">
-            <div class="price-main">${last.price}<span style="font-size:0.6rem;">円</span></div>
-          </div>
-        </div>`;
-      list.appendChild(div);
-
-      if (it.imageKey) {
-        const imgEl = document.getElementById(imgId);
-        applyImageKeyToImg(imgEl, it.imageKey);
-      }
-    });
-  }
-
-  // ========= Form =========
-  async function openForm(code) {
-    const calcArea = document.getElementById('calcOptionArea');
-    const saveBtn = document.getElementById('saveBtn');
-    const delBtn = document.getElementById('delHistBtn');
-    const storeJumpBtn = document.getElementById('storeJumpBtn');
-    if(calcArea) calcArea.style.display = 'flex';
-    if(saveBtn) saveBtn.innerText = '保存';
-    if(delBtn) delBtn.style.display = 'none';
-    if(storeJumpBtn) storeJumpBtn.style.display = 'none';
-
-    curBarcode = code; editingHistIdx = null;
-    const p = db.products[code];
-    const exists = !!p;
-
-    initCategorySelect();
-    document.getElementById('mainView').style.display='none';
-    document.getElementById('formView').style.display='block';
-
-    const ind = document.getElementById('curStoreIndicator');
-    if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
-    document.getElementById('inputPrice').value = "";
-
-    const catSel = document.getElementById('inputCategory');
-    const subSel = document.getElementById('inputSubCategory');
-
-    if (!exists) {
-      document.getElementById('inputName').value = "";
-      document.getElementById('inputMaker').value = "";
-      if (catSel) catSel.value = "__NONE__";
-      if (subSel) { subSel.style.display = 'none'; subSel.value = "__NONE__"; }
-      document.getElementById('previewImg').src = placeholderImg();
-      tempImgData = null;
-    } else {
-      document.getElementById('inputName').value = p.name || "";
-      document.getElementById('inputMaker').value = p.maker || "";
-
-      const catVal = p.category || "__NONE__";
-      if (catSel) {
-        catSel.value = ([...catSel.options].some(o => o.value === catVal)) ? catVal : "__NONE__";
-      }
-
-      if (catVal && catVal !== "__NONE__") {
-        initSubCategorySelect(catVal);
-        const subVal = p.subCategory || "__NONE__";
-        if (subSel) {
-          subSel.value = ([...subSel.options].some(o => o.value === subVal)) ? subVal : "__NONE__";
-        }
-      } else {
-        if (subSel) subSel.style.display = 'none';
-      }
-
-      const prev = document.getElementById('previewImg');
-      if (p.imageUrl && (p.imageUrl.startsWith('http://') || p.imageUrl.startsWith('https://'))) {
-        prev.src = p.imageUrl;
-      } else if (p.imageKey) {
-        prev.src = placeholderImg();
-        await applyImageKeyToImg(prev, p.imageKey);
-      } else {
-        prev.src = placeholderImg();
-      }
-      tempImgData = null;
+  if (tempImg.type === "db" && tempImg.key) {
+    const dataUrl = await idbGetImage(tempImg.key);
+    if (dataUrl) {
+      img.src = dataUrl;
+      label.textContent = "画像：この端末の画像（共有しない）";
+      return;
     }
-
-    renderDetailHistory(exists ? p.history : []);
-    renderStats(exists ? p.history : []);
+    // keyが壊れてる
+    tempImg = { type: "none" };
   }
-
-  function renderStats(history) {
-    const box = document.getElementById('statsBox');
-    if (!box) return;
-    if (!Array.isArray(history) || history.length === 0) { box.innerHTML = "過去データなし"; return; }
-    const pArr = history.map(h => h.price);
-    const avg = Math.floor(pArr.reduce((a,b)=>a+b,0)/pArr.length);
-    const low = Math.min(...pArr);
-    const last = pArr[pArr.length-1];
-    box.innerHTML = `<div class="stats-row">
-      <div class="stat-item">平均<span class="stat-val">${avg}円</span></div>
-      <div class="stat-item">最安<span class="stat-val text-danger">${low}円</span></div>
-      <div class="stat-item">前回<span class="stat-val">${last}円</span></div>
-    </div>`;
+  if (tempImg.type === "url" && tempImg.url) {
+    img.src = tempImg.url;
+    label.textContent = "画像：URL（同期で共有OK）";
+    return;
   }
+  img.removeAttribute("src");
+  label.textContent = "画像：未設定";
+}
 
-  function renderDetailHistory(history) {
-    const div = document.getElementById('detailHistory');
-    if(!div) return;
-    div.innerHTML = "";
-    const safeHistory = Array.isArray(history) ? history : [];
+/* =========================
+   Render lists
+========================= */
+async function render() {
+  // 最新購入（直近10件）
+  const listEl = $("list");
+  const histEl = $("history");
+  listEl.innerHTML = "";
+  histEl.innerHTML = "";
 
-    [...safeHistory].reverse().forEach((h, idx) => {
-      const row = document.createElement('div');
-      row.className = "history-row";
-      const actIdx = safeHistory.length - 1 - idx;
+  const purchases = [...db.purchases].sort((a,b)=> (b.ts||0)-(a.ts||0));
+  $("countInfo").textContent = `商品 ${Object.keys(db.products).length} / 履歴 ${db.purchases.length}`;
 
-      if (editingHistIdx !== null && actIdx === editingHistIdx) row.classList.add("selected");
-      row.onclick = () => editHistoryMode(actIdx);
-
-      const t = histTs(h);
-      const dateStr = t ? new Date(t).toLocaleString() : "(不明)";
-      row.innerHTML = `
-        <div class="flex-grow-1">
-          <span class="text-secondary small">${dateStr}</span><br>
-          <span class="text-white fw-bold">${h.store || '未設定'}</span>
+  const top = purchases.slice(0, 10);
+  for (const p of top) {
+    const pr = db.products[p.barcode] || {};
+    const card = document.createElement('div');
+    card.className = "card p-2";
+    card.innerHTML = `
+      <div class="list-row">
+        <img class="thumb" data-img="1" alt="">
+        <div class="grow">
+          <div class="line1">${escapeHtml(pr.name || "(無題)")}</div>
+          <div class="line2">${escapeHtml(p.store || "")} / ${escapeHtml(p.date || "")} / ¥${yen(p.price)}</div>
         </div>
-        <div class="text-end">
-          <span class="fw-bold text-white">${h.price}円</span><br>
-          <span class="text-info small">タップで編集</span>
-        </div>`;
-      div.appendChild(row);
-    });
+        <span class="badge badge-soft">${escapeHtml(p.barcode || "")}</span>
+      </div>
+    `;
+    card.addEventListener('click', ()=> setFormFromProduct(p.barcode));
+    listEl.appendChild(card);
+
+    // 画像
+    const img = card.querySelector('img[data-img="1"]');
+    await fillThumb(img, pr, p);
   }
 
-  function editHistoryMode(idx) {
-    editingHistIdx = idx;
+  // 履歴（直近50件）
+  const mid = purchases.slice(0, 50);
+  for (const p of mid) {
+    const pr = db.products[p.barcode] || {};
+    const card = document.createElement('div');
+    card.className = "card p-2";
+    card.innerHTML = `
+      <div class="list-row">
+        <img class="thumb" data-img="2" alt="">
+        <div class="grow">
+          <div class="line1">${escapeHtml(pr.name || "(無題)")}</div>
+          <div class="line2">${escapeHtml(p.store || "")} / ${escapeHtml(p.date || "")} / ¥${yen(p.price)} ${p.note ? " / "+escapeHtml(p.note) : ""}</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-light" data-edit="1"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-light" data-del="1"><i class="bi bi-trash3"></i></button>
+        </div>
+      </div>
+    `;
+    card.querySelector('[data-edit="1"]').addEventListener('click', (e)=>{ e.stopPropagation(); editPurchase(p.id); });
+    card.querySelector('[data-del="1"]').addEventListener('click', (e)=>{ e.stopPropagation(); deletePurchase(p.id); });
+    histEl.appendChild(card);
 
-    const p = db.products[curBarcode];
-    const h = p && Array.isArray(p.history) ? p.history[idx] : null;
-    if(!h) return;
+    const img = card.querySelector('img[data-img="2"]');
+    await fillThumb(img, pr, p);
+  }
+}
 
-    document.getElementById('inputPrice').value = h.price;
-    document.getElementById('inputDisc').value = 0;
-    document.getElementById('taxIn').checked = true;
+async function fillThumb(imgEl, pr, p) {
+  // 優先：購入の画像 → 商品の画像
+  const k = p.imageKey || pr.imageKey;
+  const u = p.imageUrl || pr.imageUrl;
 
-    curStore = h.store || "未設定";
-    const ind = document.getElementById('curStoreIndicator');
-    if(ind) ind.innerText = `【 ${curStore} 】で保存します`;
+  if (k) {
+    const d = await idbGetImage(k);
+    if (d) { imgEl.src = d; return; }
+  }
+  if (u) { imgEl.src = u; return; }
 
-    renderStoreList();
-    document.getElementById('calcOptionArea').style.display = "none";
-    document.getElementById('saveBtn').innerText = "変更確定";
-    document.getElementById('delHistBtn').style.display = "block";
-    document.getElementById('storeJumpBtn').style.display = "block";
+  imgEl.removeAttribute("src");
+}
 
-    renderDetailHistory(p.history);
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c)=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast("店名は上のチップで変更できます", 3000);
-    document.getElementById('priceSection').scrollIntoView({behavior: 'smooth'});
+/* =========================
+   CRUD
+========================= */
+function upsertProductFromForm() {
+  const barcode = $("barcode").value.trim();
+  if (!barcode) { showToast("バーコードが空です。", 4000); return null; }
+
+  const name = $("name").value.trim();
+  const maker = $("maker").value.trim();
+  const store = $("store").value.trim();
+  const price = Number(($("price").value || "").replace(/[^\d]/g,'')) || 0;
+  const date  = $("date").value || nowDateStr();
+  const note  = $("note").value.trim();
+
+  const pr = db.products[barcode] || { barcode };
+  pr.barcode = barcode;
+  pr.name = name;
+  pr.maker = maker;
+  pr.note = note;
+
+  // 画像
+  if (tempImg.type === "db") {
+    pr.imageKey = tempImg.key || null;
+    pr.imageUrl = null;
+  } else if (tempImg.type === "url") {
+    pr.imageUrl = tempImg.url || null;
+    pr.imageKey = null;
+  } else {
+    // 変更しない、ではなく「未設定」で上書き
+    pr.imageKey = null;
+    pr.imageUrl = null;
   }
 
-  function jumpToStoreChips() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    showToast("上の店名チップで変更できます", 3000);
+  pr.last = { store, price, date, note };
+  db.products[barcode] = pr;
+
+  // 履歴1件追加
+  const purchase = {
+    id: `p_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    ts: Date.now(),
+    barcode, store, price, date,
+    note,
+    imageKey: (tempImg.type === "db") ? (tempImg.key || null) : null,
+    imageUrl: (tempImg.type === "url") ? (tempImg.url || null) : null
+  };
+  db.purchases.push(purchase);
+
+  saveDb();
+  showToast("保存しました。", 2800);
+  return barcode;
+}
+
+async function editPurchase(id) {
+  const p = db.purchases.find(x=> x.id === id);
+  if (!p) return;
+
+  const pr = db.products[p.barcode] || {};
+  const title = "履歴を編集";
+  const text = `商品: ${pr.name || "(無題)"}\n\n形式：店名｜価格｜日付（YYYY-MM-DD）\n例：カスミ｜198｜2026-01-03`;
+  const init = `${p.store || ""}｜${p.price ?? ""}｜${p.date || ""}`;
+  const v = await customPrompt(title, text, init);
+  if (!v) return;
+
+  const parts = String(v).split("｜").map(s=> s.trim());
+  if (parts.length >= 1) p.store = parts[0] || p.store;
+  if (parts.length >= 2) p.price = Number((parts[1]||"").replace(/[^\d]/g,'')) || p.price;
+  if (parts.length >= 3) p.date = parts[2] || p.date;
+
+  saveDb();
+  await render();
+  showToast("履歴を更新しました。", 3000);
+}
+
+async function deletePurchase(id) {
+  const p = db.purchases.find(x=> x.id === id);
+  if (!p) return;
+
+  const v = await customPrompt("削除確認", "この履歴を削除しますか？（削除すると元に戻せません）", "delete と入力");
+  if (String(v || "").trim().toLowerCase() !== "delete") return;
+
+  db.purchases = db.purchases.filter(x=> x.id !== id);
+  saveDb();
+  await render();
+  showToast("履歴を削除しました。", 3000);
+}
+
+async function deleteCurrentProduct() {
+  const barcode = $("barcode").value.trim();
+  if (!barcode) { showToast("バーコードが空です。", 4000); return; }
+  const pr = db.products[barcode];
+  if (!pr) { showToast("その商品は見つかりません。", 4000); return; }
+
+  const v = await customPrompt("削除確認", "この商品と関連する履歴を削除しますか？（戻せません）", "delete と入力");
+  if (String(v || "").trim().toLowerCase() !== "delete") return;
+
+  // 画像キーがあれば消す（この端末のみ）
+  if (pr.imageKey) await idbDelImage(pr.imageKey);
+
+  delete db.products[barcode];
+  db.purchases = db.purchases.filter(x=> x.barcode !== barcode);
+  saveDb();
+  clearForm();
+  await render();
+  showToast("商品を削除しました。", 3500);
+}
+
+/* =========================
+   Image actions
+========================= */
+$("fileImage").addEventListener('change', async (e)=>{
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try {
+    const dataUrl = await fileToResizedDataUrl(f, 900, 0.82);
+    const key = await idbPutImage(dataUrl);
+    tempImg = { type:"db", key };
+    await updateImgPreview();
+    showToast("画像をセットしました（この端末だけ）。共有したいなら🔍→URLがおすすめ。", 7000);
+  } catch(err) {
+    showToast("画像の読み込みに失敗しました。", 6000);
+  } finally {
+    e.target.value = "";
   }
+});
 
-  async function saveData() {
-    if (curStore === "未設定") { showToast("店名を選んでください", 4000); return; }
+$("btnClearImage").addEventListener('click', async ()=>{
+  tempImg = { type:"none" };
+  await updateImgPreview();
+  showToast("画像をクリアしました。", 2500);
+});
 
-    const cat = document.getElementById('inputCategory').value;
-    if (cat === "__NONE__") { showToast("カテゴリを選んでください", 4000); return; }
+/* ---- 女性目線：🔍の流れを迷わない形に ----
+   1) まず検索（一覧）を開く
+   2) 戻ってきたら URL貼付ダイアログ
+----------------------------------------- */
+$("btnImageWeb").addEventListener('click', ()=> startImageSearchFlow());
 
-    const subSel = document.getElementById('inputSubCategory');
-    const needsSub = (subSel && subSel.style.display !== 'none');
-    const sub = needsSub ? subSel.value : "__NONE__";
-    if (needsSub && sub === "__NONE__") { showToast("サブカテゴリを選んでください", 4000); return; }
+function getDisplayMode() {
+  // iOS standalone / PWA 判定
+  const isStandalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  const isIosStandalone = (navigator.standalone === true);
+  return (isStandalone || isIosStandalone) ? "standalone" : "browser";
+}
+function openExternal(url) {
+  // PWAで window.open が動かない端末があるので、ダメならlocation遷移
+  try {
+    const w = window.open(url, "_blank", "noopener,noreferrer");
+    if (w) return true;
+  } catch(e) {}
+  try { location.href = url; return true; } catch(e) {}
+  return false;
+}
 
-    const p = db.products[curBarcode] || { history: [] };
-    p.name = document.getElementById('inputName').value || "名称なし";
-    p.category = cat;
-    p.subCategory = needsSub ? sub : "";
-    p.maker = document.getElementById('inputMaker').value || "";
+function startImageSearchFlow() {
+  const barcode = $("barcode").value.trim() || currentBarcode || "";
+  const name = ($("name").value || "").trim() || "商品画像";
+  const q = encodeURIComponent(`${name} 商品 画像`);
+  const url = `https://www.google.com/search?tbm=isch&q=${q}`;
 
-    if (tempImgData && tempImgData.type === 'key') {
-      p.imageKey = tempImgData.key;
-      delete p.image;
-    } else if (tempImgData && tempImgData.type === 'url') {
-      p.imageUrl = tempImgData.url;
-      delete p.image;
-    }
+  pendingImageSearch = { barcode, name, ts: Date.now() };
+  try { localStorage.setItem("SP_PENDING_IMGSEARCH", JSON.stringify(pendingImageSearch)); } catch(e) {}
 
-    const val = Number(document.getElementById('inputPrice').value);
-    if (!Number.isFinite(val) || val <= 0) { showToast("価格を入力してください", 4000); return; }
+  openExternal(url);
 
-    if (editingHistIdx !== null) {
-      p.history[editingHistIdx].price = val;
-      p.history[editingHistIdx].store = curStore;
-      showToast("変更を反映しました", 2000);
-    } else {
-      const disc = Number(document.getElementById('inputDisc').value || 0);
-      let finalP = Math.floor(val * (1 - disc/100));
-      if(document.getElementById('taxEx').checked) finalP = Math.floor(finalP * 1.08);
-      db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
-      const entry = { price: finalP, store: curStore, ts: Date.now() };
-      if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
-      p.history.push(entry);
-      showToast("保存完了", 2000);
-    }
+  showToast("①画像を選ぶ → ②「画像のアドレスをコピー」→ ③戻ると貼付欄が出ます", 9000);
+}
 
-    db.products[curBarcode] = p;
-    db = normalizeDb(db);
+async function maybeOpenImageUrlPrompt() {
+  if (promptResolve) return; // すでにプロンプト中
 
-    saveLocalOnly();
-    syncFirebasePut();
-
-    renderHistory();
-    showHome();
-  }
-
-  function toggleHistoryList() {
-    const div = document.getElementById('detailHistory');
-    const btn = document.getElementById('toggleHistBtn');
-    if (!div || !btn) return;
-    const isHidden = (div.style.display === "none" || !div.style.display);
-    div.style.display = isHidden ? "block" : "none";
-    btn.innerText = isHidden ? "購入履歴を隠す" : "購入履歴を表示（タップで編集）";
-  }
-
-  function toggleGps() {
-    if(!isGpsOn) {
-      isGpsOn = true; lastGpsTime = "…"; renderStoreList(); showToast("GPS取得中…", 3000);
-      navigator.geolocation.getCurrentPosition((pos) => {
-        curPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const d = new Date(); lastGpsTime = `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-        renderStoreList(); showToast("GPS取得成功", 2000);
-      }, (err) => {
-        showToast(`GPSエラー: ${err.message}`, 8000);
-        isGpsOn = false; renderStoreList();
-      }, { enableHighAccuracy: true, timeout: 10000 });
-    } else {
-      isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); showToast("GPS OFF", 1500);
-    }
-  }
-
-  function startScanner() {
-    if(isScanning) return;
-    isScanning = true;
-    document.getElementById('camera-area').style.display='block';
-    showToast("カメラ起動中…", 2000);
-    if(!scanner) scanner = new Html5Qrcode("interactive");
-    scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:180}}, async (t)=> {
-      showToast("読み取りOK", 1500);
-      await stopScanner();
-      openForm(t);
-    }).catch(() => {
-      showToast("起動失敗", 8000);
-      stopScanner();
-    });
-  }
-
-  async function stopScanner() {
-    if(scanner) {
-      try { await scanner.stop(); } catch(e) {}
-      finally { document.getElementById('camera-area').style.display='none'; isScanning = false; }
-    } else {
-      document.getElementById('camera-area').style.display='none'; isScanning = false;
-    }
-  }
-
-  function showHome() {
-    document.getElementById('mainView').style.display='block';
-    document.getElementById('formView').style.display='none';
-    renderHistory();
-    renderStoreList();
-    tempImgData = null;
-    editingHistIdx = null;
-  }
-
-  async function showVeggieMenu() {
-    const v = await customPrompt("名称入力");
-    if(v && v.trim()) openForm("M_"+v.trim());
-  }
-
-  function setupFocusGuides() {
-    const gs = { 'inputName': "例：コーラ 500ml", 'inputPrice': "価格を入力" };
-    Object.keys(gs).forEach(id => {
-      const el=document.getElementById(id);
-      if(el) el.onfocus = () => showToast(gs[id], 1500);
-    });
-  }
-
-  async function searchImageWeb() {
-    const name = (document.getElementById('inputName').value || '').trim();
-
-    const u = await customPrompt(
-      "商品ページ/画像ページのURLを貼る（空欄なら画像検索を開く）",
-      ""
-    );
-
-    // 空欄なら従来どおり検索を開く（奥さん運用でも迷わない）
-    if (!u || !u.trim()) {
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(name || '商品画像')}+商品画像&tbm=isch`, '_blank', 'noopener');
-      return;
-    }
-
-    const raw = u.trim();
-    if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-      showToast("http(s)から始まるURLだけ対応です", 7000);
-      return;
-    }
-
-    showToast("画像を自動取得中…（数秒）", 8000);
-
-    const rep = await resolveRepresentativeImageUrl(raw);
-    if (!rep) {
-      showToast("このURLから画像が取れませんでした。画像検索を開きます。", 8000);
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(name || '商品画像')}+商品画像&tbm=isch`, '_blank', 'noopener');
-      return;
-    }
-
-    const sharedThumb = makeSharedThumbUrl(rep, 256);
-    document.getElementById('previewImg').src = sharedThumb;
-    tempImgData = { type:'url', url: sharedThumb };
-
-    showToast("OK：代表画像を取得しました（同期されます）", 4000);
-  }
-
-  async function handleImage(input) {
-    if (input.files && input.files[0]) {
-      const file = input.files[0];
-      showToast("画像を保存中…", 2000);
-
-      const blob = await fileToThumbBlob(file, 256, 0.78);
-      if (!blob) {
-        showToast("画像の読み込みに失敗しました", 8000);
-        return;
-      }
-      const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-      const ok = await idbPut(key, blob);
-
-      const prev = document.getElementById('previewImg');
-      try {
-        const url = URL.createObjectURL(blob);
-        prev.src = url;
-      } catch(e) {}
-
-      if (!ok) {
-        showToast("端末の画像保存に失敗しました（設定/容量を確認）", 10000);
-        return;
-      }
-      tempImgData = { type:'key', key };
-      showToast("画像をこの端末に保存しました（同期はしません）", 5000);
-    }
-  }
-
-  function customPrompt(msg, def = "") {
-    return new Promise(res => {
-      document.getElementById('dialogMsg').innerText = msg;
-      document.getElementById('dialogInputArea').style.display="block";
-      const i = document.getElementById('dialogInput');
-      i.value = def;
-      document.getElementById('dialogCancel').style.display="block";
-      document.getElementById('dialogModal').style.display="flex";
-      document.getElementById('dialogOk').onclick = () => { document.getElementById('dialogModal').style.display="none"; res(i.value); };
-      document.getElementById('dialogCancel').onclick = () => { document.getElementById('dialogModal').style.display="none"; res(null); };
-    });
-  }
-
-  function customConfirm(msg) {
-    return new Promise(res => {
-      document.getElementById('dialogMsg').innerText = msg;
-      document.getElementById('dialogInputArea').style.display="none";
-      document.getElementById('dialogCancel').style.display="block";
-      document.getElementById('dialogModal').style.display="flex";
-      document.getElementById('dialogOk').onclick = () => { document.getElementById('dialogModal').style.display="none"; res(true); };
-      document.getElementById('dialogCancel').onclick = () => { document.getElementById('dialogModal').style.display="none"; res(false); };
-    });
-  }
-
-  async function confirmDeleteHist() {
-    if(editingHistIdx === null) return;
-    const ok = await customConfirm("この履歴を削除しますか？");
-    if(!ok) return;
-    db.products[curBarcode].history.splice(editingHistIdx, 1);
-    saveLocalOnly();
-    syncFirebasePut();
-    showHome();
-  }
-
-  // ========= Settings / Sync =========
-  async function startMigration() {
-    const btn = document.getElementById('syncBtn');
-    const urlEl = document.getElementById('fb-url-input');
-    const cityEl = document.getElementById('home-city-input');
-
-    const u = (urlEl ? urlEl.value : '').trim();
-    const cityInput = (cityEl ? cityEl.value : '').trim();
-
-    if (btn) { btn.disabled = true; btn.innerText = "同期中…"; }
-    showToast("同期を開始…", 3000);
-    activeSyncController = new AbortController();
-
+  // pendingを復元
+  if (!pendingImageSearch) {
     try {
-      db.config.homeCity = cityInput;
-      db = normalizeDb(db);
-      saveLocalOnly();
+      const raw = localStorage.getItem("SP_PENDING_IMGSEARCH");
+      if (raw) pendingImageSearch = JSON.parse(raw);
+    } catch(e) {}
+  }
+  if (!pendingImageSearch) return;
 
-      if(!u) {
-        showToast("ローカル保存完了", 3000);
-        closeSettings(); showHome();
-        return;
-      }
-
-      const targetUrl = getSafeUrl(u);
-
-      // ✅ PUT前にクラウドを読み、マージしてから送る（端末間の取りこぼし減）
-      try {
-        const res0 = await fetchWithTimeout(targetUrl, { signal: activeSyncController.signal }, 9000);
-        const cloud0 = await res0.json();
-        if (cloud0 && cloud0.products) {
-          db = mergeDb(db, cloud0);
-          saveLocalOnly();
-        }
-      } catch(e) {
-        // 読めなくても続行
-      }
-
-      const payload = stripForCloud(db);
-      await fetchWithTimeout(targetUrl, {
-        method: 'PUT',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: activeSyncController.signal
-      }, 12000);
-
-      fbUrl = u;
-      localStorage.setItem('smartPriceFirebaseUrl', u);
-
-      await syncFirebase(); // GETで最終整合（Edge対策）
-
-      showToast("同期成功！", 3000);
-      closeSettings(); showHome();
-
-    } catch(e) {
-      const msg = (e.name === 'AbortError') ? "タイムアウト/中断" : e.message;
-      showToast(`同期失敗（${msg}）`, 10000);
-    } finally {
-      activeSyncController = null;
-      resetSyncBtn();
-    }
+  // 10分経ったら破棄
+  if (Date.now() - (pendingImageSearch.ts||0) > 10*60*1000) {
+    pendingImageSearch = null;
+    try { localStorage.removeItem("SP_PENDING_IMGSEARCH"); } catch(e) {}
+    return;
   }
 
-  function openSettings() {
-    try {
-      db = normalizeDb(db);
-      resetSyncBtn();
-      const modal = document.getElementById('settingsModal');
-      if(!modal) { showToast('設定画面を開けません', 8000); return; }
-      modal.style.display = 'flex';
-      const urlInput = document.getElementById('fb-url-input');
-      if(urlInput) urlInput.value = fbUrl;
-      const cityInput = document.getElementById('home-city-input');
-      if(cityInput) cityInput.value = db.config.homeCity || '';
-      renderCityChips();
-    } catch(e) {
-      showToast('設定画面エラー', 8000);
-    }
+  // ここでダイアログ
+  let clip = "";
+  // ※自動で読み取れる端末だけ、クリップボードが入る（ダメなら空のまま）
+  try { clip = await navigator.clipboard.readText(); } catch(e) {}
+
+  const title = "画像URLを貼る";
+  const text =
+`貼り方（おすすめ）
+1) 画像を長押し（右クリック）
+2) 「画像のアドレスをコピー」
+3) ここに貼り付け → OK
+
+※ページURLしかない場合でも、できる範囲で画像を自動抽出します。`;
+
+  const v = await customPrompt(title, text, clip || "");
+  if (!v) return;
+
+  // pendingはここで消す（何度も出ないように）
+  pendingImageSearch = null;
+  try { localStorage.removeItem("SP_PENDING_IMGSEARCH"); } catch(e) {}
+
+  const normalized = normalizeImageUrl(v);
+  if (!normalized) {
+    showToast("URLとして認識できませんでした。もう一度、画像のアドレスを貼ってください。", 8000);
+    return;
   }
 
-  function closeSettings() {
-    const modal = document.getElementById('settingsModal');
-    if(modal) modal.style.display = 'none';
+  let finalUrl = normalized;
+
+  // 画像っぽくないURLなら、og:image等を拾えるか試す
+  if (!looksLikeDirectImageUrl(finalUrl)) {
+    showToast("ページから画像を探しています…（取れない時はそのまま使います）", 6000);
+    finalUrl = await tryResolveOgImage(finalUrl);
   }
 
-  function renderCityChips() {
-    const chipArea = document.getElementById('city-history-chips');
-    if(!chipArea) return;
-    chipArea.innerHTML = "";
-    db = normalizeDb(db);
-    const cities = Array.isArray(db.config.homeCities) ? db.config.homeCities : [];
-    cities.forEach(city => {
-      if(typeof city !== 'string' || !city.trim()) return;
-      const chip = document.createElement('span');
-      chip.className = 'city-chip';
-      chip.innerText = city;
-      chip.onclick = () => {
-        const inp = document.getElementById('home-city-input');
-        if(inp) inp.value = city;
-        showToast(`${city}を選択`, 1500);
-      };
-      chipArea.appendChild(chip);
-    });
-  }
+  tempImg = { type:"url", url: finalUrl };
+  await updateImgPreview();
+  showToast("画像リンクをセットしました（同期で共有OK）。保存ボタンで確定します。", 8000);
+}
 
-  function buildBaseUrl() {
-    return (location.origin + location.pathname).replace(/\/+$/, "/");
+document.addEventListener('visibilitychange', ()=>{
+  if (!document.hidden) {
+    // 検索タブから戻ったタイミングで開く
+    setTimeout(()=> { maybeOpenImageUrlPrompt(); }, 250);
   }
-  function buildUrl(withDebug=false) {
-    const base = buildBaseUrl();
-    return `${base}?b=${encodeURIComponent(BUILD_ID)}` + (withDebug ? `&debug=1` : ``);
-  }
+});
 
-  function openWebModal() {
-    const m = document.getElementById('webModal');
-    if(!m) return;
-    const n = document.getElementById('webUrlNormal');
-    const d = document.getElementById('webUrlDebug');
-    if(n) n.value = buildUrl(false);
-    if(d) d.value = buildUrl(true);
-    m.style.display = "flex";
+/* =========================
+   Sync (Firebase RTDB JSON)
+========================= */
+async function firebasePull() {
+  const url = (db.settings.firebaseUrl || "").trim();
+  if (!url) { showToast("設定でFirebase URLを入れてください。", 6000); return; }
+
+  const res = await fetch(url, { cache:"no-store" });
+  if (!res.ok) throw new Error("pull failed");
+  const remote = await res.json();
+  if (!remote || typeof remote !== "object") throw new Error("remote empty");
+
+  // ざっくりマージ（基本はリモート優先）
+  db = remote;
+  normalizeDb();
+  saveDb();
+  showToast("同期：取得しました。", 3500);
+}
+
+async function firebasePush() {
+  const url = (db.settings.firebaseUrl || "").trim();
+  if (!url) { showToast("設定でFirebase URLを入れてください。", 6000); return; }
+
+  const slim = makeSlimDbForStorage(db); // 画像データは送らない
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type":"application/json" },
+    body: JSON.stringify(slim)
+  });
+  if (!res.ok) throw new Error("push failed");
+  db.settings.lastSyncAt = Date.now();
+  saveDb();
+  showToast("同期：送信しました。", 3500);
+}
+
+async function doSync() {
+  const mode = await customPrompt("同期", "どちらをしますか？\n\npull：Firebase→この端末\npush：この端末→Firebase", "pull");
+  if (!mode) return;
+  const m = String(mode).trim().toLowerCase();
+  try {
+    if (m === "pull") await firebasePull();
+    else if (m === "push") await firebasePush();
+    else showToast("pull / push のどちらかを入力してください。", 6000);
+    await render();
+  } catch(e) {
+    showToast("同期に失敗しました。URLやFirebaseルールを確認してください。", 8000);
   }
-  function closeWebModal() {
-    const m = document.getElementById('webModal');
-    if(m) m.style.display = "none";
+}
+
+/* =========================
+   Settings / Export
+========================= */
+async function openSettings() {
+  const cur = db.settings.firebaseUrl || "";
+  const v = await customPrompt("設定", "Firebase URL（Realtime Databaseの .json まで）を入力\n例: https://xxxx-default-rtdb.firebaseio.com/smartprice.json", cur);
+  if (v == null) return;
+  db.settings.firebaseUrl = String(v).trim();
+  saveDb();
+  showToast("設定を保存しました。", 3000);
+}
+
+function exportJson() {
+  const data = makeSlimDbForStorage(db);
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `smart-price_${BUILD_ID}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(a.href), 1000);
+  showToast("JSONを書き出しました。", 3500);
+}
+
+/* =========================
+   PWA service worker safe register
+========================= */
+async function registerSwSafely() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    // sw.js が無い環境（ローカル/未配置）では登録しない
+    const testUrl = `sw.js?b=${encodeURIComponent(getParam('b') || DEFAULT_BUILD)}`;
+    const res = await fetch(testUrl, { cache:"no-store" });
+    if (!res.ok) return;
+
+    await navigator.serviceWorker.register(testUrl, { scope: "./" });
+  } catch(e) {
+    // 失敗してもアプリは動く
   }
-  async function copyUrl(id) {
-    const el = document.getElementById(id);
-    if(!el) return;
-    const text = el.value || "";
-    try {
-      await navigator.clipboard.writeText(text);
-      showToast("コピーしました", 2000);
-    } catch(e) {
-      el.focus(); el.select();
-      try { document.execCommand('copy'); showToast("コピーしました", 2000); }
-      catch(e2) { showToast("コピーできませんでした", 8000); }
-    }
+}
+
+/* =========================
+   Wire events / Boot
+========================= */
+$("btnSave").addEventListener('click', async ()=>{
+  const b = upsertProductFromForm();
+  if (b) {
+    currentBarcode = b;
+    await render();
   }
-  function openUrlFromBox(id) {
-    const el = document.getElementById(id);
-    if(!el) return;
-    const text = el.value || "";
-    window.open(text, "_blank", "noopener");
-  }
+});
+$("btnNew").addEventListener('click', ()=> { clearForm(); showToast("新規入力にしました。", 2500); });
+$("btnDelete").addEventListener('click', ()=> deleteCurrentProduct());
+$("btnSync").addEventListener('click', ()=> doSync());
+$("btnSettings").addEventListener('click', ()=> openSettings());
+$("btnExport").addEventListener('click', ()=> exportJson());
+
+$("barcode").addEventListener('change', ()=>{
+  const b = $("barcode").value.trim();
+  if (db.products[b]) setFormFromProduct(b);
+});
+
+function initDateInput() {
+  // PCでdateが出ない場合がある → そのままでも入力できるよう保険（type=dateのまま）
+  if (!$("date").value) $("date").value = nowDateStr();
+}
+
+(async function boot(){
+  ensureBuildParamNoReload();
+  setBuildUi();
+  loadDb();
+  initDateInput();
+  clearForm();
+  await render();
+  await registerSwSafely();
+
+  // 起動直後の「黒いだけ」感を減らす一言
+  showToast("起動しました。", 1200);
+
+  // もし「検索から戻った」直後ならURL貼付を出す
+  setTimeout(()=> maybeOpenImageUrlPrompt(), 400);
+})();
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
