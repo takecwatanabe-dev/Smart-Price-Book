@@ -1,18 +1,19 @@
 <!--
 APP: Smart Price
 FILE: index.html
-VERSION: v19.9c-hf11
-DATE(JST): 2026-01-02 13:18 JST
-TITLE: 画像復活（IndexedDB保存）＋サブカテゴリ復活＋Edge対策（同期安全化）
+VERSION: v19.9c-hf12-pwa1-imgfix1
+DATE(JST): 2026-01-03 18:41 JST
+TITLE: サブカテゴリ修正＋PWA対応＋ホーム画像表示改善（last優先対応）
 CHANGES:
-- 画像：端末内IndexedDBに保存してホームで表示（Firebaseには送らない）
-- 旧data:imageは端末内で自動移行（残っている端末は復活可能）
-- 同期：PUT前にクラウド確認、PUT後にGETで再読込（Edgeの空表示対策）
-- 履歴編集の選択行：赤枠の縁取り（見失わない）
-- カテゴリ→サブカテゴリを復活（その他・追記あり）
-- debug=1 のとき JSエラーをトーストで表示（切り分け用）
-AUTHOR: Yui
-BUILD_PARAM: ?b=2026-01-02_1318_hf11
+- サブカテゴリ：categoryTreeが空の場合、DEFAULT_CATEGORY_TREEから補完
+- normalizeDb：categoryTreeの初期化と補完を強化
+- PWA：manifest.jsonにstart_url/scope追加、sw.js新規作成、SW登録コード追加
+- ホーム画像：保存時にimageKeyを必ず作成、renderHistoryでappend後バインド、openFormで統一
+- ホーム画像：spBindItemImageにlastも渡し、last優先で画像を表示（同一端末内で確実に表示）
+- バージョン：v19.9c-hf11 → v19.9c-hf12-pwa1 → v19.9c-hf12-pwa1-imgfix1
+AUTHOR: Yui / Rex
+BUILD_ID: 2026-01-03_1841_hf12-pwa1-imgfix1
+BUILD_PARAM: ?b=2026-01-03_1841_hf12-pwa1-imgfix1
 DEBUG_PARAM: &debug=1
 POLICY: 見た目は極力維持（機能復活は最小UIで）
 -->
@@ -26,7 +27,7 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#D50000">
-  <title>Smart Price v19.9c-hf11</title>
+  <title>Smart Price v19.9c-hf12-pwa1-imgfix1</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <style>
@@ -87,7 +88,7 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
 
 <body>
 <header class="header d-flex justify-content-between align-items-center">
-  <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf11</span></h5>
+  <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf12-pwa1-imgfix1</span></h5>
   <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -232,8 +233,8 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  const APP_VERSION = "v19.9c-hf11";
-  const BUILD_ID = "2026-01-02_1318_hf11";
+  const APP_VERSION = "v19.9c-hf12-pwa1-imgfix1";
+  const BUILD_ID = "2026-01-03_1841_hf12-pwa1-imgfix1";
 
   // ========= Debug =========
   function isDebug() {
@@ -350,6 +351,23 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
     } catch(e){ return null; }
   }
 
+  // ✅ dataURLtoBlob（保存用、より安全な実装）
+  function dataURLtoBlob(dataurl){
+    try{
+      const parts = String(dataurl).split(',');
+      const head = parts[0] || '';
+      const b64 = parts[1] || '';
+      const m = head.match(/data:(.*?);base64/);
+      const mime = (m && m[1]) ? m[1] : 'image/png';
+      const bin = atob(b64);
+      const u8 = new Uint8Array(bin.length);
+      for (let i=0;i<bin.length;i++) u8[i] = bin.charCodeAt(i);
+      return new Blob([u8], { type: mime });
+    }catch(e){
+      return null;
+    }
+  }
+
   async function fileToThumbBlob(file, maxSide=256, quality=0.78) {
     return new Promise((resolve) => {
       const fr = new FileReader();
@@ -389,6 +407,48 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
       try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
     }
     imgEl.dataset.objurl = url;
+  }
+
+  // ========= Home Image Fix (base64 + IndexedDB対応) =========
+  async function spBindItemImage(imgEl, item, last) {
+    if (!imgEl || !item) return;
+    
+    // 優先順位：last.imageData → item.imageData → last.imageKey → item.imageKey → last.imageUrl → item.imageUrl → placeholder
+    
+    // 1. base64データ（imageData）があれば優先
+    if (last && last.imageData && typeof last.imageData === 'string' && last.imageData.startsWith('data:')) {
+      imgEl.src = last.imageData;
+      return;
+    }
+    if (item.imageData && typeof item.imageData === 'string' && item.imageData.startsWith('data:')) {
+      imgEl.src = item.imageData;
+      return;
+    }
+    
+    // 2. IndexedDB（imageKey）があれば取得
+    if (last && last.imageKey && typeof last.imageKey === 'string') {
+      await applyImageKeyToImg(imgEl, last.imageKey);
+      return;
+    }
+    if (item.imageKey && typeof item.imageKey === 'string') {
+      await applyImageKeyToImg(imgEl, item.imageKey);
+      return;
+    }
+    
+    // 3. HTTP/HTTPS URL（imageUrl）があれば使用
+    if (last && last.imageUrl && typeof last.imageUrl === 'string' && 
+        (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://'))) {
+      imgEl.src = last.imageUrl;
+      return;
+    }
+    if (item.imageUrl && typeof item.imageUrl === 'string' && 
+        (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) {
+      imgEl.src = item.imageUrl;
+      return;
+    }
+    
+    // 4. どれもなければplaceholder
+    imgEl.src = placeholderImg();
   }
 
   // ========= App State =========
@@ -469,7 +529,7 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
     if (!o.products || typeof o.products !== "object") o.products = {};
     if (!o.config || typeof o.config !== "object") o.config = {};
 
-    // categoryTree を正として整形
+    // categoryTree を正として整形（DEFAULT_CATEGORY_TREEから補完）
     if (!o.config.categoryTree || typeof o.config.categoryTree !== "object") {
       // 旧 categories しかない場合
       if (Array.isArray(o.config.categories) && o.config.categories.length) {
@@ -479,6 +539,14 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
       } else {
         o.config.categoryTree = JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE));
       }
+    } else {
+      // ✅ 既存のcategoryTreeがある場合、DEFAULT_CATEGORY_TREEのデータで補完
+      const merged = JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE));
+      Object.keys(merged).forEach(key => {
+        if (!o.config.categoryTree[key] || !Array.isArray(o.config.categoryTree[key]) || o.config.categoryTree[key].length === 0) {
+          o.config.categoryTree[key] = merged[key];
+        }
+      });
     }
     // categories は表示用のキー配列（互換）
     o.config.categories = Object.keys(o.config.categoryTree);
@@ -733,9 +801,22 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
     if (!sub) return;
     if (!cat || cat === "__NONE__") { sub.style.display = 'none'; return; }
 
-    db = normalizeDb(db);
-    let list = (db.config.categoryTree && db.config.categoryTree[cat]) ? db.config.categoryTree[cat] : [];
-    if (!Array.isArray(list)) list = [];
+    db = normalizeDb(db); // ✅ 正規化を確実に実行
+    
+    // ✅ categoryTreeが存在しない、または空の場合、DEFAULT_CATEGORY_TREEから取得
+    let list = [];
+    if (db.config.categoryTree && db.config.categoryTree[cat] && Array.isArray(db.config.categoryTree[cat]) && db.config.categoryTree[cat].length > 0) {
+      list = db.config.categoryTree[cat];
+    } else if (DEFAULT_CATEGORY_TREE[cat] && Array.isArray(DEFAULT_CATEGORY_TREE[cat])) {
+      // ✅ DEFAULT_CATEGORY_TREEから取得して、db.config.categoryTreeに保存
+      list = DEFAULT_CATEGORY_TREE[cat];
+      if (!db.config.categoryTree) db.config.categoryTree = {};
+      db.config.categoryTree[cat] = [...list];
+      saveLocalOnly(); // 保存して次回から使えるように
+    } else {
+      list = ["その他"];
+    }
+    
     if (!list.includes("その他")) list = [...list, "その他"];
 
     sub.style.display = 'block';
@@ -748,6 +829,7 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
         const n = await customPrompt("新しいサブカテゴリ名");
         if (n && n.trim()) {
           const name = n.trim();
+          if (!db.config.categoryTree) db.config.categoryTree = {};
           if (!db.config.categoryTree[cat]) db.config.categoryTree[cat] = [];
           if (!db.config.categoryTree[cat].includes(name)) db.config.categoryTree[cat].push(name);
           if (!db.config.categoryTree[cat].includes("その他")) db.config.categoryTree[cat].push("その他");
@@ -843,12 +925,9 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
       div.className = 'card price-card';
       div.onclick = () => openForm(it.code);
 
-      const imgId = `img_${it.code.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
-      const imgSrc = (it.imageUrl && (it.imageUrl.startsWith('http://') || it.imageUrl.startsWith('https://'))) ? it.imageUrl : placeholderImg();
-
       div.innerHTML = `
         <div class="d-flex align-items-center">
-          <img id="${imgId}" src="${imgSrc}" class="prod-thumb">
+          <img src="" class="prod-thumb">
           <div class="flex-grow-1 overflow-hidden">
             <div class="fw-bold text-white small text-truncate">${it.name || ''}</div>
             <div class="text-secondary" style="font-size:0.6rem;">${last.store || '未設定'}</div>
@@ -859,10 +938,10 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
         </div>`;
       list.appendChild(div);
 
-      // ✅ 端末内画像（imageKey）があれば後から差し込む
-      if (it.imageKey) {
-        const imgEl = document.getElementById(imgId);
-        applyImageKeyToImg(imgEl, it.imageKey);
+      // ✅ 画像をバインド（append後、divの中から拾う、lastも渡す）
+      const imgEl = div.querySelector('img.prod-thumb');
+      if (imgEl) {
+        spBindItemImage(imgEl, it, last).catch(()=>{ imgEl.src = placeholderImg(); });
       }
     });
   }
@@ -919,15 +998,11 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
         if (subSel) subSel.style.display = 'none';
       }
 
-      // 画像表示：imageUrl → imageKey → placeholder
+      // ✅ 画像表示：spBindItemImageで統一
       const prev = document.getElementById('previewImg');
-      if (p.imageUrl && (p.imageUrl.startsWith('http://') || p.imageUrl.startsWith('https://'))) {
-        prev.src = p.imageUrl;
-      } else if (p.imageKey) {
-        prev.src = placeholderImg();
-        await applyImageKeyToImg(prev, p.imageKey);
-      } else {
-        prev.src = placeholderImg();
+      if (prev) {
+        prev.src = '';
+        spBindItemImage(prev, p).catch(()=>{ prev.src = placeholderImg(); });
       }
       tempImgData = null; // 新規選択があれば上書き
     }
@@ -1030,8 +1105,18 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
     p.subCategory = needsSub ? sub : "";
     p.maker = document.getElementById('inputMaker').value || "";
 
-    // 画像：URL or imageKey（端末内）
-    if (tempImgData && tempImgData.type === 'key') {
+    // ✅ 画像（プレビュー）→ IndexedDBへ保存し、商品に imageKey を持たせる
+    if (tempImgData && typeof tempImgData === 'string' && tempImgData.startsWith('data:')) {
+      const blob = dataURLtoBlob(tempImgData);
+      if (blob) {
+        const key = 'img_' + String(curBarcode || '').replace(/[^\w\-]/g, '_'); // 安全なキー
+        await idbPut(key, blob);
+        p.imageKey = key;
+      }
+      // localStorageに画像を抱えない（重くなるので）
+      delete p.imageData;
+      delete p.image;
+    } else if (tempImgData && tempImgData.type === 'key') {
       p.imageKey = tempImgData.key;
       delete p.image;
       // 端末画像優先。URLは残してもいいが混乱するのでそのままにする
@@ -1373,21 +1458,11 @@ POLICY: 見た目は極力維持（機能復活は最小UIで）
   }
 </script>
 <script>
-(function(){
-  if (!("serviceWorker" in navigator)) return;
-  window.addEventListener("load", function(){
-    navigator.serviceWorker.register("./sw.js", { scope: "./" })
-      .catch(function(e){ console.warn("SW register failed:", e); });
-  });
-})();
-</script>
-<script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(()=>{});
   });
 }
 </script>
-
 </body>
 </html>
