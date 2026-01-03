@@ -1,26 +1,13 @@
 {
   "name": "Smart Price",
-  "short_name": "Smart Price",
-  "description": "買い物価格メモ＆比較（Smart Price）",
-  "lang": "ja",
-  "start_url": "./",
+  "short_name": "SmartPrice",
+  "start_url": "./?b=2026-01-03_2155_imgflow1",
   "scope": "./",
   "display": "standalone",
+  "background_color": "#121212",
   "theme_color": "#D50000",
-  "background_color": "#D50000",
-  "orientation": "portrait",
   "icons": [
-    {
-      "src": "./icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "./icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }
