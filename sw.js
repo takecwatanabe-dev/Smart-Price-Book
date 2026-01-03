@@ -1,54 +1,51 @@
+
 /**
  * APP: Smart Price
  * FILE: sw.js
- * VERSION: v19.9c-hf13-pwa2-imgflow1
- * DATE(JST): 2026-01-03 21:55 JST
- * BUILD: 2026-01-03_2155_imgflow1
+ * VERSION: v19.9c-hf12-pwa2-imgfix4
+ * DATE(JST): 2026-01-03 17:38 JST
+ * AUTHOR: Yui
+ * TITLE: 先祖帰り抑止（HTMLはネット優先）＋古いキャッシュ自動破棄
  */
-const BUILD = "2026-01-03_2155_imgflow1";
-const CACHE = "smart-price-" + BUILD;
 
-const PRECACHE = [
-  "./",
-  "./index.html",
-  "./manifest.json",
-  "./icon-192.png",
-  "./icon-512.png"
-];
+const BUILD_ID = "2026-01-03_1738_hf12";
+const CACHE_PREFIX = "smartprice-cache-";
+const CACHE_NAME = `${CACHE_PREFIX}${BUILD_ID}`;
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+  self.skipWaiting();
+  event.waitUntil((async () => {
+    await caches.open(CACHE_NAME);
+  })());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    (async ()=>{
-      const keys = await caches.keys();
-      await Promise.all(keys.map(k => (k !== CACHE) ? caches.delete(k) : Promise.resolve()));
-      await self.clients.claim();
-    })()
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => {
+      if (k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME) return caches.delete(k);
+    }));
+    await self.clients.claim();
+  })());
 });
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  const url = new URL(req.url);
 
-  // Firebase等のAPIは触らない（ネットワーク優先）
-  if (req.method !== "GET") return;
-
-  // 同一オリジンの静的だけキャッシュ
-  if (url.origin === location.origin) {
-    event.respondWith((async ()=>{
-      const cache = await caches.open(CACHE);
-      const hit = await cache.match(req, { ignoreSearch: true });
-      if (hit) return hit;
-      const res = await fetch(req);
-      // 成功したものだけキャッシュ
-      if (res && res.ok) cache.put(req, res.clone());
-      return res;
+  // 画面（HTML）はネット優先：ここで先祖帰りを断つ
+  if (req.mode === "navigate") {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(new Request(req.url, { cache: "reload" }));
+        return fresh;
+      } catch (e) {
+        const cache = await caches.open(CACHE_NAME);
+        const cached = await cache.match(req);
+        return cached || Response.error();
+      }
     })());
+    return;
   }
+
+  // それ以外は素通し（安定優先）
 });
