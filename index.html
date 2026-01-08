@@ -1619,5 +1619,300 @@ POLICY: 見た目は極力維持（内部だけ安定化）
     window.open(text, "_blank", "noopener");
   }
 </script>
+<!--
+APP: Smart Price
+FILE: index.html (APPEND PATCH BLOCK)
+VERSION: v19.9c-hf13-yahooai-imgfix1
+DATE(JST): 2026-01-08 10:43 JST
+TITLE: ホーム画像の確実表示＋Yahoo(JAN)自動取得＋AIメモ（トースト）
+CHANGES:
+- renderHistory: 画像キーは last.imageKey / product.imageKey を両対応、ID依存をやめて div.querySelector で確実に拾う
+- openForm: JAN(数字8〜14桁)なら Yahoo商品検索API(V3) から商品名/画像を自動取得（URL入力なし）
+- savePurchase/addHistory: 直近価格を履歴から軽く判定して「AIメモ」トースト表示（UI追加なし）
+AUTHOR: Yui (ChatGPT)
+BUILD_PARAM: ?b=2026-01-08_1043_yahooai-imgfix1
+DEBUG_PARAM: &debug=1
+POLICY: UI変更なし（内部ロジックのみ）
+-->
+
+<script>
+(function () {
+  var PATCH_VERSION = "v19.9c-hf13-yahooai-imgfix1";
+  var PATCH_BUILD = "2026-01-08_1043_yahooai-imgfix1";
+
+  function safeToast(msg) {
+    try {
+      if (typeof showToast === "function") showToast(msg);
+      else if (typeof toast === "function") toast(msg);
+      else console.log("[toast]", msg);
+    } catch (e) {}
+  }
+
+  function isJan(code) {
+    return /^[0-9]{8,14}$/.test(code || "");
+  }
+
+  function getLast(arr) {
+    return (arr && arr.length) ? arr[arr.length - 1] : null;
+  }
+
+  function getYahooAppId() {
+    var LS_KEY = "smartprice_yahoo_appid";
+    var v = "";
+    try { v = localStorage.getItem(LS_KEY) || ""; } catch (e) {}
+
+    // もしdb.settingsに置いてあればそれも拾う（UIは増やさない）
+    if (!v) {
+      try { v = (window.db && db.settings && db.settings.yahooAppId) ? db.settings.yahooAppId : ""; } catch (e) {}
+    }
+
+    // 未設定なら1回だけ聞く（URLではなくClient ID）
+    if (!v) {
+      v = (prompt("YahooのClient ID（アプリID）を入れてね。空欄ならスキップします。", "") || "").trim();
+      if (v) {
+        try { localStorage.setItem(LS_KEY, v); } catch (e) {}
+      }
+    }
+    return (v || "").trim();
+  }
+
+  async function fetchJsonViaJina(url) {
+    // CORS回避のため r.jina.ai を経由（JSONをそのまま取ってparse）
+    var r = await fetch("https://r.jina.ai/" + url, { cache: "no-store" });
+    var t = await r.text();
+
+    // 先頭に説明行が混ざることがあるので、最初の { からJSONとして読む
+    var i = t.indexOf("{");
+    var j = t.indexOf("[");
+    var start = -1;
+    if (i >= 0 && j >= 0) start = Math.min(i, j);
+    else start = Math.max(i, j);
+    if (start < 0) throw new Error("JSONが見つかりません");
+    return JSON.parse(t.slice(start));
+  }
+
+  async function yahooAutoFillByJan(jan) {
+    var appid = getYahooAppId();
+    if (!appid) return null;
+
+    // Yahoo Shopping Web Service(V3) itemSearch: jan_code で検索
+    var url =
+      "https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch" +
+      "?appid=" + encodeURIComponent(appid) +
+      "&jan_code=" + encodeURIComponent(jan) +
+      "&results=1" +
+      "&image_size=300";
+
+    var data = await fetchJsonViaJina(url);
+    var hit = (data && data.hits && data.hits[0]) ? data.hits[0] : null;
+    if (!hit) return null;
+
+    var name = String(hit.name || hit.title || "");
+    var imageUrl = "";
+    try {
+      if (hit.image) imageUrl = String(hit.image.medium || hit.image.small || hit.image.large || "");
+      if (!imageUrl && hit.imageUrl) imageUrl = String(hit.imageUrl);
+    } catch (e) {}
+    return { name: name, imageUrl: imageUrl };
+  }
+
+  // ---------------------------------------
+  // 1) renderHistory を上書き（画像を確実に表示）
+  // ---------------------------------------
+  var __orig_renderHistory = window.renderHistory;
+
+  window.renderHistory = function renderHistory_patched() {
+    try {
+      var list = document.getElementById("historyList");
+      if (!list || !window.db || !db.products) {
+        if (typeof __orig_renderHistory === "function") return __orig_renderHistory();
+        return;
+      }
+
+      list.innerHTML = "";
+
+      var items = Object.keys(db.products).map(function (k) {
+        var obj = db.products[k] || {};
+        obj.code = k;
+        return obj;
+      });
+
+      var _histTs = (typeof window.histTs === "function") ? window.histTs : function (h) {
+        try {
+          if (!h) return 0;
+          if (typeof h.ts === "number") return h.ts;
+          if (typeof h.ts === "string") return new Date(h.ts).getTime() || 0;
+        } catch (e) {}
+        return 0;
+      };
+
+      items.sort(function (a, b) {
+        var la = getLast(a.history);
+        var lb = getLast(b.history);
+        return (_histTs(lb) || 0) - (_histTs(la) || 0);
+      });
+
+      items.forEach(function (it) {
+        if (!it.history || !it.history.length) return;
+
+        var last = getLast(it.history);
+
+        var div = document.createElement("div");
+        div.className = "card price-card";
+        div.onclick = function () {
+          try { if (typeof openForm === "function") openForm(it.code); } catch (e) {}
+        };
+
+        var imgSrc = "";
+        if (it.imageUrl && /^https?:\/\//.test(it.imageUrl)) imgSrc = it.imageUrl;
+        else if (typeof placeholderImg === "function") imgSrc = placeholderImg();
+
+        div.innerHTML =
+          '<div class="d-flex align-items-center">' +
+            '<img src="' + (imgSrc || "") + '" class="prod-thumb" referrerpolicy="no-referrer">' +
+            '<div class="flex-grow-1 overflow-hidden">' +
+              '<div class="fw-bold text-white small text-truncate">' + (it.name || "") + '</div>' +
+              '<div class="text-secondary" style="font-size:0.6rem;">' + ((last && last.store) ? last.store : "未設定") + '</div>' +
+            '</div>' +
+            '<div class="text-end ms-2">' +
+              '<div class="price-main">' + ((last && last.price) ? last.price : "") + '<span style="font-size:0.6rem;">円</span></div>' +
+            '</div>' +
+          '</div>';
+
+        list.appendChild(div);
+
+        // ✅ ここが肝：imageKey は last / product どっちでも拾う
+        var key = (last && last.imageKey) ? last.imageKey : it.imageKey;
+
+        // ✅ IDに頼らず、今作ったdivの中から確実に拾う
+        if (key && typeof applyImageKeyToImg === "function") {
+          var imgEl = div.querySelector("img.prod-thumb");
+          if (imgEl) {
+            try { applyImageKeyToImg(imgEl, key); } catch (e) {}
+          }
+        }
+      });
+    } catch (e) {
+      try { if (typeof __orig_renderHistory === "function") __orig_renderHistory(); } catch (_) {}
+    }
+  };
+
+  // ---------------------------------------
+  // 2) openForm をパッチ（JAN→Yahoo自動取得）
+  // ---------------------------------------
+  var __orig_openForm = window.openForm;
+
+  window.openForm = function openForm_patched(code) {
+    if (typeof __orig_openForm === "function") __orig_openForm(code);
+
+    try {
+      if (!code || !window.db || !db.products) return;
+
+      var p = db.products[code];
+      if (!p) {
+        p = { name: "", imageUrl: "", history: [] };
+        db.products[code] = p;
+      }
+
+      var last = getLast(p.history);
+
+      var hasAnyImage =
+        (p.imageUrl && /^https?:\/\//.test(p.imageUrl)) ||
+        !!p.imageKey ||
+        !!(last && last.imageKey);
+
+      var need = (!p.name || !String(p.name).trim()) || !hasAnyImage;
+
+      if (need && isJan(code)) {
+        yahooAutoFillByJan(code).then(function (res) {
+          if (!res) return;
+
+          var changed = false;
+          if (res.name && (!p.name || !String(p.name).trim())) { p.name = res.name; changed = true; }
+          if (res.imageUrl && (!p.imageUrl || !/^https?:\/\//.test(p.imageUrl))) { p.imageUrl = res.imageUrl; changed = true; }
+
+          if (changed) {
+            try { if (typeof saveDb === "function") saveDb(); } catch (e) {}
+            try { if (typeof renderHistory === "function") renderHistory(); } catch (e) {}
+            safeToast("Yahooから商品名/画像を自動取得したよ（URL入力なし）");
+
+            // 可能ならフォーム側にも反映（DOMのIDが違っても影響なし）
+            try {
+              var nameInput = document.querySelector("#prodName, #productName, input[name='name']");
+              if (nameInput && p.name) nameInput.value = p.name;
+
+              var imgPreview = document.querySelector("#prodImagePreview img, #imagePreview img, img.prod-preview");
+              if (imgPreview && p.imageUrl) imgPreview.src = p.imageUrl;
+            } catch (e) {}
+          }
+        }).catch(function (err) {
+          var dbg = false;
+          try { dbg = (new URL(location.href)).searchParams.get("debug") === "1"; } catch (e) {}
+          if (dbg) safeToast("Yahoo取得に失敗: " + (err && err.message ? err.message : err));
+        });
+      }
+    } catch (e) {}
+  };
+
+  // ---------------------------------------
+  // 3) 「AIメモ」トースト（UI追加なし）
+  // ---------------------------------------
+  function analyzePriceHint(code) {
+    try {
+      var p = db.products[code];
+      if (!p || !p.history || p.history.length < 3) return null;
+
+      var prices = [];
+      for (var i = 0; i < p.history.length; i++) {
+        var n = Number(p.history[i].price || 0);
+        if (n > 0) prices.push(n);
+      }
+      if (prices.length < 3) return null;
+
+      var last = prices[prices.length - 1];
+      var min = Math.min.apply(null, prices);
+      var sum = prices.reduce(function (a, b) { return a + b; }, 0);
+      var avg = sum / prices.length;
+
+      if (last <= min * 1.03) return "AIメモ：この価格、過去の最安にかなり近いよ（最安 " + Math.round(min) + "円）";
+      if (last >= avg * 1.20) return "AIメモ：いつもより高めかも（平均 " + Math.round(avg) + "円）";
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // 既存の保存関数名がどれでも動くように、見つかったものだけパッチする
+  if (typeof window.savePurchase === "function") {
+    var __orig_save = window.savePurchase;
+    window.savePurchase = function () {
+      var r = __orig_save.apply(this, arguments);
+      try {
+        var code = "";
+        if (window.currentCode) code = String(window.currentCode);
+        if (!code) {
+          var bi = document.querySelector("#barcodeInput");
+          if (bi && bi.value) code = String(bi.value);
+        }
+        var hint = code ? analyzePriceHint(code) : null;
+        if (hint) safeToast(hint);
+      } catch (e) {}
+      return r;
+    };
+  } else if (typeof window.addHistory === "function") {
+    var __orig_add = window.addHistory;
+    window.addHistory = function (code) {
+      var r = __orig_add.apply(this, arguments);
+      try {
+        var hint = code ? analyzePriceHint(String(code)) : null;
+        if (hint) safeToast(hint);
+      } catch (e) {}
+      return r;
+    };
+  }
+
+  safeToast("Smart Price パッチ適用: " + PATCH_VERSION + " / " + PATCH_BUILD);
+})();
+</script>
 </body>
 </html>
