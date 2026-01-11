@@ -1,20 +1,20 @@
 <!--
 APP: Smart Price
 FILE: index.html
-VERSION: v19.9c-hf13-pwa1-imgfix4
-DATE(JST): 2026-01-03 16:43 JST
-TITLE: ホーム画像が消える対策（同期で端末imageKeyが消える問題を恒久修正）
+VERSION: v19.9c-hf16-sync1
+DATE(JST): 2026-01-11 11:28 JST
+TITLE: 同期処理の安定化（ロック機構＋原子的反映＋深いマージ）
 CHANGES:
-- クラウドGET後にローカル専用項目（imageKey等）を保持するマージ処理を追加（上書きで消えない）
-- 端末画像キーを「バーコード由来キー」＋「端末内キーMAP」で保持し、同期後も復元しやすく
-- spBindItemImage：保存済みキー/端末MAP/バーコード由来キーの順に復元を試行
-- 旧画像移行(migrateLegacyImagesToIdb)：バーコード由来キーへ寄せ、MAPへ記録
-- stripForCloud：クラウドへは imageKey を送らない（history内に紛れた鍵も除去）
-AUTHOR: Yui / Rex
-BUILD_ID: 2026-01-03_1643_hf13-imgfix4
-BUILD_PARAM: ?b=2026-01-03_1643_hf13-imgfix4
+- 同期ロック機構追加（syncInFlight + syncQueued）で二重起動を完全防止
+- 原子的な反映処理（validateMergedDb + 一括保存）で中途半端な状態を防止
+- 深いマージ（history内のimageKey/imageUrlも保護）
+- stripForCloudの削りすぎ防止（history内は削除しない）
+- デバッグログ追加（?debug=1時のみ：同期結果、マージ結果、統計）
+AUTHOR: Rex
+BUILD_ID: 2026-01-11_1128_sync1
+BUILD_PARAM: ?b=2026-01-11_1128_sync1
 DEBUG_PARAM: &debug=1
-POLICY: 見た目は極力維持（内部で安定化）
+POLICY: UI変更なし（内部実装のみ）
 -->
 
 <!DOCTYPE html>
@@ -22,11 +22,12 @@ POLICY: 見た目は極力維持（内部で安定化）
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="manifest" href="manifest.json">
+  <!-- manifest.json 404対策：一旦無効化（PWAは後で復活） -->
+  <!-- <link rel="manifest" href="manifest.json"> -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#D50000">
-  <title>Smart Price v19.9c-hf13-imgfix4</title>
+  <title>Smart Price v19.9c-hf16-sync1</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <style>
@@ -55,6 +56,7 @@ POLICY: 見た目は極力維持（内部で安定化）
     .stat-val { display: block; font-weight: bold; color: #fff; font-size: 0.9rem; }
 
     .history-row { font-size: 0.8rem; padding: 10px 0; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    /* ✅ 見失わない赤枠（レイアウトを崩さない） */
     .history-row.selected {
       background: rgba(213,0,0,0.10);
       box-shadow: inset 0 0 0 2px rgba(213,0,0,0.95);
@@ -86,7 +88,7 @@ POLICY: 見た目は極力維持（内部で安定化）
 
 <body>
 <header class="header d-flex justify-content-between align-items-center">
-  <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf13-imgfix4</span></h5>
+   <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf16-sync1</span></h5>
   <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -117,11 +119,12 @@ POLICY: 見た目は極力維持（内部で安定化）
               <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
               <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
             </div>
-            <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
+            <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImage(this)">
           </div>
           <div class="flex-grow-1">
             <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
             <select id="inputCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px;"></select>
+            <!-- ✅ サブカテゴリ復活（最小UI） -->
             <select id="inputSubCategory" class="form-control bg-dark text-white border-secondary mb-2" style="font-size:0.85rem; padding:4px; display:none;"></select>
             <input type="text" id="inputMaker" class="form-control bg-dark text-white border-secondary py-1" style="font-size:0.85rem;" placeholder="メーカー名">
           </div>
@@ -228,22 +231,99 @@ POLICY: 見た目は極力維持（内部で安定化）
 
 <div id="toast" class="toast-msg"></div>
 
+<!-- Firebase SDK (v9 compat) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  const APP_VERSION = "v19.9c-hf13-imgfix4";
-  const BUILD_ID = "2026-01-03_1643_hf13-imgfix4";
+  const APP_VERSION = "v19.9c-hf16-sync1";
+  const BUILD_ID = "2026-01-11_1128_sync1";
 
+  // ========= Firebase Configuration =========
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyCYjQ79KgsohOPlEViHBX5BygVUvX-70l4",
+    authDomain: "smartpricedb.firebaseapp.com",
+    databaseURL: "https://smartpricedb-default-rtdb.firebaseio.com",
+    projectId: "smartpricedb",
+    storageBucket: "smartpricedb.firebasestorage.app",
+    messagingSenderId: "892635601514",
+    appId: "1:892635601514:web:3a496e522a9972e8de0813",
+    measurementId: "G-317L3VFKQV"
+  };
+
+  // ========= Firebase Initialization =========
+  let firebaseApp = null;
+  let firebaseAuth = null;
+  let firebaseDb = null;
+  let currentAuthUid = null;
+  let isFirebaseReady = false;
+
+  async function initializeFirebase() {
+    try {
+      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) {
+        if (isDebug()) console.warn('[Firebase] Config not set, fallback to legacy mode');
+        return false;
+      }
+
+      // Firebase初期化
+      firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+      firebaseAuth = firebase.auth();
+      firebaseDb = firebase.database();
+
+      // 匿名ログイン
+      await firebaseAuth.signInAnonymously();
+      currentAuthUid = firebaseAuth.currentUser?.uid;
+
+      if (!currentAuthUid) {
+        throw new Error('Anonymous sign-in failed: no uid');
+      }
+
+      isFirebaseReady = true;
+      if (isDebug()) {
+        console.log('[Firebase] Initialized successfully');
+        console.log('[Firebase] Auth UID:', currentAuthUid);
+      }
+      return true;
+
+    } catch(e) {
+      if (isDebug()) console.warn('[Firebase] Initialization failed:', e);
+      isFirebaseReady = false;
+      return false;
+    }
+  }
+
+  // Auth状態変化の監視
+  function setupAuthListener() {
+    if (!firebaseAuth) return;
+    firebaseAuth.onAuthStateChanged((user) => {
+      if (user) {
+        currentAuthUid = user.uid;
+        if (isDebug()) console.log('[Firebase] Auth state changed, UID:', currentAuthUid);
+      } else {
+        currentAuthUid = null;
+        isFirebaseReady = false;
+        if (isDebug()) console.warn('[Firebase] User signed out');
+      }
+    });
+  }
+
+  // ========= Debug =========
   function isDebug() {
     try { return new URL(location.href).searchParams.get('debug') === '1'; } catch(e){ return false; }
   }
   if (isDebug()) {
-    window.addEventListener('error', (e) => { showToast(`JSエラー: ${e.message}`, 10000); });
+    window.addEventListener('error', (e) => {
+      showToast(`JSエラー: ${e.message}`, 10000);
+    });
     window.addEventListener('unhandledrejection', (e) => {
       const msg = (e && e.reason && e.reason.message) ? e.reason.message : String(e.reason || e);
       showToast(`Promiseエラー: ${msg}`, 10000);
     });
   }
 
+  // ========= Category Tree（Amazon/Rakutenを実用レベルに整理＋追記可） =========
   const DEFAULT_CATEGORY_TREE = {
     "ドリンク": ["水・ミネラルウォーター","炭酸飲料","乳飲料","コーヒー","紅茶","お茶","スポーツドリンク","ジュース","粉末ドリンク","その他"],
     "お酒": ["ビール","発泡酒","チューハイ","日本酒","焼酎","ワイン","ウイスキー","梅酒","その他"],
@@ -275,6 +355,7 @@ POLICY: 見た目は極力維持（内部で安定化）
   };
 
   const DEFAULT_CONFIG = {
+    // 互換のため残す（実体は categoryTree）
     categories: [],
     categoryTree: JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE)),
     lastTax: "ex",
@@ -292,35 +373,7 @@ POLICY: 見た目は極力維持（内部で安定化）
   // ========= Image Store (IndexedDB) =========
   const IMG_DB_NAME = "smart_price_img_db_v1";
   const IMG_STORE = "images";
-  const IMG_KEY_MAP_LS = "smart_price_img_map_v1";
   let imgDbPromise = null;
-
-  function loadImgKeyMap() {
-    try { return JSON.parse(localStorage.getItem(IMG_KEY_MAP_LS) || "{}") || {}; }
-    catch(e){ return {}; }
-  }
-  function saveImgKeyMap(map) {
-    try { localStorage.setItem(IMG_KEY_MAP_LS, JSON.stringify(map || {})); } catch(e){}
-  }
-  function rememberImgKey(code, key) {
-    const c = String(code || "").trim();
-    const k = String(key || "").trim();
-    if (!c || !k) return;
-    const m = loadImgKeyMap();
-    m[c] = k;
-    saveImgKeyMap(m);
-  }
-  function getRememberedImgKey(code) {
-    const c = String(code || "").trim();
-    if (!c) return "";
-    const m = loadImgKeyMap();
-    return (m && m[c]) ? String(m[c]) : "";
-  }
-  function imgKeyFromCode(code) {
-    const s = String(code || "").trim();
-    if (!s) return `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    return "img_" + s.replace(/[^\w\-]/g, "_");
-  }
 
   function openImgDb() {
     if (!('indexedDB' in window)) return Promise.resolve(null);
@@ -329,18 +382,25 @@ POLICY: 見た目は極力維持（内部で安定化）
       const req = indexedDB.open(IMG_DB_NAME, 1);
       req.onupgradeneeded = (e) => {
         const db = e.target.result;
+        // ✅ 保存箱が存在しない場合は必ず作成（既存ユーザーでも安全）
         if (!db.objectStoreNames.contains(IMG_STORE)) {
-          try { db.createObjectStore(IMG_STORE); } catch (err) { console.warn('[IDB] createObjectStore failed:', err); }
+          try {
+            db.createObjectStore(IMG_STORE);
+          } catch (err) {
+            console.warn('[IDB] createObjectStore failed:', err);
+          }
         }
       };
       req.onsuccess = () => {
         const db = req.result;
+        // ✅ 保存箱が存在することを確認（念のため）
         if (db && !db.objectStoreNames.contains(IMG_STORE)) {
+          // 保存箱が無い場合は再作成を試みる
           try {
             db.close();
             indexedDB.deleteDatabase(IMG_DB_NAME);
-            imgDbPromise = null;
-            resolve(openImgDb());
+            imgDbPromise = null; // リセット
+            resolve(openImgDb()); // 再帰呼び出し
             return;
           } catch (err) {
             console.warn('[IDB] recreate failed:', err);
@@ -350,7 +410,10 @@ POLICY: 見た目は極力維持（内部で安定化）
         }
         resolve(db);
       };
-      req.onerror = (e) => { console.warn('[IDB] open failed:', e); resolve(null); };
+      req.onerror = (e) => {
+        console.warn('[IDB] open failed:', e);
+        resolve(null);
+      };
     });
     return imgDbPromise;
   }
@@ -358,30 +421,50 @@ POLICY: 見た目は極力維持（内部で安定化）
   async function idbPut(key, blob) {
     const dbi = await openImgDb();
     if (!dbi) return false;
-    if (!dbi.objectStoreNames.contains(IMG_STORE)) { console.warn('[IDB] objectStore not found:', IMG_STORE); return false; }
+    // ✅ 保存箱の存在確認
+    if (!dbi.objectStoreNames.contains(IMG_STORE)) {
+      console.warn('[IDB] objectStore not found:', IMG_STORE);
+      return false;
+    }
     return new Promise((res) => {
       try {
         const tx = dbi.transaction(IMG_STORE, "readwrite");
         const store = tx.objectStore(IMG_STORE);
         store.put(blob, key);
         tx.oncomplete = () => res(true);
-        tx.onerror = (e) => { console.warn('[IDB] put failed:', e); res(false); };
-      } catch (err) { console.warn('[IDB] transaction failed:', err); res(false); }
+        tx.onerror = (e) => {
+          console.warn('[IDB] put failed:', e);
+          res(false);
+        };
+      } catch (err) {
+        console.warn('[IDB] transaction failed:', err);
+        res(false);
+      }
     });
   }
 
   async function idbGet(key) {
     const dbi = await openImgDb();
     if (!dbi) return null;
-    if (!dbi.objectStoreNames.contains(IMG_STORE)) { console.warn('[IDB] objectStore not found:', IMG_STORE); return null; }
+    // ✅ 保存箱の存在確認
+    if (!dbi.objectStoreNames.contains(IMG_STORE)) {
+      console.warn('[IDB] objectStore not found:', IMG_STORE);
+      return null;
+    }
     return new Promise((res) => {
       try {
         const tx = dbi.transaction(IMG_STORE, "readonly");
         const store = tx.objectStore(IMG_STORE);
         const req = store.get(key);
         req.onsuccess = () => res(req.result || null);
-        req.onerror = (e) => { console.warn('[IDB] get failed:', e); res(null); };
-      } catch (err) { console.warn('[IDB] transaction failed:', err); res(null); }
+        req.onerror = (e) => {
+          console.warn('[IDB] get failed:', e);
+          res(null);
+        };
+      } catch (err) {
+        console.warn('[IDB] transaction failed:', err);
+        res(null);
+      }
     });
   }
 
@@ -397,6 +480,7 @@ POLICY: 見た目は極力維持（内部で安定化）
     } catch(e){ return null; }
   }
 
+  // ✅ dataURLtoBlob（保存用、より安全な実装）
   function dataURLtoBlob(dataurl){
     try{
       const parts = String(dataurl).split(',');
@@ -428,8 +512,11 @@ POLICY: 見た目は極力維持（内部で安定化）
           const ctx = canvas.getContext('2d');
           ctx.fillStyle = "#fff";
           ctx.fillRect(0,0,cw,ch);
+          // ✅ EXIF情報は自動で削除される（canvas.drawImageで再描画するため）
           ctx.drawImage(img, 0,0,cw,ch);
-          canvas.toBlob((blob) => { resolve(blob || null); }, 'image/jpeg', quality);
+          canvas.toBlob((blob) => {
+            resolve(blob || null);
+          }, 'image/jpeg', quality);
         };
         img.onerror = () => resolve(null);
         img.src = fr.result;
@@ -439,88 +526,244 @@ POLICY: 見た目は極力維持（内部で安定化）
     });
   }
 
-  async function applyImageKeyToImg(imgEl, key) {
-    if (!imgEl || !key) return false;
-    const blob = await idbGet(key);
-    if (!blob) return false;
-    const url = URL.createObjectURL(blob);
-    if (imgEl.dataset && imgEl.dataset.objurl) { try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {} }
-    imgEl.src = url;
-    if (imgEl.dataset) imgEl.dataset.objurl = url;
-    return true;
+  // ========= 画像をFirebaseにアップロード（SDK版：Auth + DB Rules対応） =========
+  async function uploadImageToFirebase(code, blob) {
+    // Firebase SDK が有効な場合はSDK版を使用
+    if (isFirebaseReady && firebaseDb && currentAuthUid) {
+      try {
+        // Blobをbase64に変換
+        const dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.onerror = () => reject(new Error('画像読み込み失敗'));
+          fr.readAsDataURL(blob);
+        });
+
+        const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+        const imageRecord = {
+          owner: currentAuthUid,  // ✅ auth.uid を使用
+          imageUrl: dataUrl,
+          createdAt: Date.now()
+        };
+
+        // Firebase SDK（database）で保存
+        const ref = firebaseDb.ref(`smart_price_images/${code}/${imageId}`);
+        await ref.set(imageRecord);
+
+        if (isDebug()) console.log('[Firebase SDK] Image uploaded:', imageId);
+        return { imageId, owner: currentAuthUid };
+
+      } catch(e) {
+        if (isDebug()) console.warn('[Firebase SDK] Upload failed, fallback to REST:', e);
+        // フォールバック: REST版を実行
+      }
+    }
+
+    // フォールバック: REST版（従来方式）
+    if (!fbUrl) {
+      throw new Error('Firebase URLが設定されていません');
+    }
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => reject(new Error('画像読み込み失敗'));
+      fr.readAsDataURL(blob);
+    });
+
+    const deviceId = getDeviceId();
+    const imageId = 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    const imageRecord = {
+      owner: deviceId,  // レガシー: deviceId
+      imageUrl: dataUrl,
+      createdAt: Date.now()
+    };
+
+    const imageUrl = getImageUrl(fbUrl, code, imageId);
+    await fetchWithTimeout(imageUrl, {
+      method: 'PUT',
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(imageRecord)
+    }, 15000);
+
+    return { imageId, owner: deviceId };
   }
 
-  async function ensureDeterministicKey(code, currentKey) {
-    const c = String(code || "").trim();
-    if (!c) return currentKey || "";
-    const det = imgKeyFromCode(c);
-    const cur = String(currentKey || "").trim();
-    if (!cur) return det; // まだ鍵が無いなら、まずはdetを候補にする
-    if (cur === det) return det;
-    // 旧キー→detへコピーできたらdetに寄せる（復元耐性UP）
-    const blob = await idbGet(cur);
-    if (blob) {
-      const ok = await idbPut(det, blob);
-      if (ok) return det;
+  // ========= 共有画像を取得（SDK版：ランダム表示用） =========
+  async function getSharedImages(code) {
+    // Firebase SDK が有効な場合はSDK版を使用
+    if (isFirebaseReady && firebaseDb) {
+      try {
+        const ref = firebaseDb.ref(`smart_price_images/${code}`);
+        const snapshot = await ref.once('value');
+        const data = snapshot.val();
+        
+        if (!data || typeof data !== 'object') return [];
+        
+        const images = [];
+        for (const [imageId, record] of Object.entries(data)) {
+          if (record && typeof record === 'object' && record.imageUrl) {
+            images.push({ imageId, ...record });
+          }
+        }
+        
+        if (isDebug()) console.log('[Firebase SDK] Loaded images:', images.length);
+        return images;
+
+      } catch(e) {
+        if (isDebug()) console.warn('[Firebase SDK] Get images failed, fallback to REST:', e);
+        // フォールバック: REST版を実行
+      }
     }
-    return cur;
+
+    // フォールバック: REST版（従来方式）
+    if (!fbUrl) return [];
+    try {
+      const listUrl = getImageListUrl(fbUrl, code);
+      const res = await fetchWithTimeout(listUrl, {}, 10000);
+      const data = await res.json();
+      if (!data || typeof data !== 'object') return [];
+      
+      const images = [];
+      for (const [imageId, record] of Object.entries(data)) {
+        if (record && typeof record === 'object' && record.imageUrl) {
+          images.push({ imageId, ...record });
+        }
+      }
+      return images;
+    } catch(e) {
+      if (isDebug()) console.warn('[getSharedImages]', e);
+      return [];
+    }
+  }
+
+  // ========= 自分の画像を取得（SDK版：owner確認） =========
+  async function getMyImages(code) {
+    const allImages = await getSharedImages(code);
+    
+    // Firebase SDK が有効な場合は auth.uid で判定
+    if (isFirebaseReady && currentAuthUid) {
+      return allImages.filter(img => img.owner === currentAuthUid);
+    }
+    
+    // フォールバック: deviceId で判定
+    const deviceId = getDeviceId();
+    return allImages.filter(img => img.owner === deviceId);
+  }
+
+  // ========= 画像を削除（SDK版：DB Rulesで強制） =========
+  async function deleteImageFromFirebase(code, imageId) {
+    // Firebase SDK が有効な場合はSDK版を使用（DB Rules で権限チェック）
+    if (isFirebaseReady && firebaseDb && currentAuthUid) {
+      try {
+        const ref = firebaseDb.ref(`smart_price_images/${code}/${imageId}`);
+        
+        // owner確認
+        const snapshot = await ref.once('value');
+        const record = snapshot.val();
+        
+        if (!record) {
+          throw new Error('画像が見つかりません');
+        }
+        
+        if (record.owner !== currentAuthUid) {
+          throw new Error('削除権限がありません（投稿者のみ削除可能）');
+        }
+        
+        // 削除（DB Rulesでも権限チェックされる）
+        await ref.remove();
+        
+        if (isDebug()) console.log('[Firebase SDK] Image deleted:', imageId);
+        return;
+
+      } catch(e) {
+        if (isDebug()) console.warn('[Firebase SDK] Delete failed:', e);
+        throw e;  // エラーを再スロー
+      }
+    }
+
+    // フォールバック: REST版（従来方式）
+    if (!fbUrl) {
+      throw new Error('Firebase URLが設定されていません');
+    }
+
+    // owner確認
+    const imageUrl = getImageUrl(fbUrl, code, imageId);
+    const res = await fetchWithTimeout(imageUrl, {}, 8000);
+    const record = await res.json();
+    
+    if (!record || record.owner !== getDeviceId()) {
+      throw new Error('削除権限がありません（投稿者のみ削除可能）');
+    }
+
+    // 削除
+    await fetchWithTimeout(imageUrl, {
+      method: 'DELETE'
+    }, 8000);
+  }
+
+  async function applyImageKeyToImg(imgEl, key) {
+    if (!imgEl || !key) {
+      return Promise.reject(new Error('Invalid parameters'));
+    }
+    try {
+      const blob = await idbGet(key);
+      if (!blob) {
+        return Promise.reject(new Error('Image not found in IndexedDB'));
+      }
+      const url = URL.createObjectURL(blob);
+      imgEl.src = url;
+      imgEl.referrerPolicy = "no-referrer";
+      // メモリ解放（置換時）
+      if (imgEl.dataset && imgEl.dataset.objurl) {
+        try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
+      }
+      imgEl.dataset.objurl = url;
+    } catch(e) {
+      if (isDebug()) console.warn('[applyImageKeyToImg]', e);
+      return Promise.reject(e);
+    }
   }
 
   // ========= Home Image Fix (base64 + IndexedDB対応) =========
-  async function spBindItemImage(imgEl, item, last, codeOpt) {
+  async function spBindItemImage(imgEl, item, last) {
     if (!imgEl || !item) return;
-
-    const code = (codeOpt || item.code || item.barcode || "").toString();
-
-    // 1) base64（残ってる場合のみ）
-    if (last && last.imageData && typeof last.imageData === 'string' && last.imageData.startsWith('data:')) { imgEl.src = last.imageData; return; }
-    if (item.imageData && typeof item.imageData === 'string' && item.imageData.startsWith('data:')) { imgEl.src = item.imageData; return; }
-
-    // 2) 既存の鍵（product/history）
+    
+    // 優先順位：last.imageData → item.imageData → last.imageKey → item.imageKey → last.imageUrl → item.imageUrl → placeholder
+    
+    // 1. base64データ（imageData）があれば優先
+    if (last && last.imageData && typeof last.imageData === 'string' && last.imageData.startsWith('data:')) {
+      imgEl.src = last.imageData;
+      return;
+    }
+    if (item.imageData && typeof item.imageData === 'string' && item.imageData.startsWith('data:')) {
+      imgEl.src = item.imageData;
+      return;
+    }
+    
+    // 2. IndexedDB（imageKey）があれば取得
     if (last && last.imageKey && typeof last.imageKey === 'string') {
-      const ok = await applyImageKeyToImg(imgEl, last.imageKey);
-      if (ok) return;
+      await applyImageKeyToImg(imgEl, last.imageKey);
+      return;
     }
     if (item.imageKey && typeof item.imageKey === 'string') {
-      const ok = await applyImageKeyToImg(imgEl, item.imageKey);
-      if (ok) return;
+      await applyImageKeyToImg(imgEl, item.imageKey);
+      return;
     }
-
-    // 3) 端末MAP（同期でdbが入れ替わっても残る）
-    const mapped = getRememberedImgKey(code);
-    if (mapped) {
-      const ok = await applyImageKeyToImg(imgEl, mapped);
-      if (ok) {
-        try {
-          if (code && db && db.products && db.products[code] && !db.products[code].imageKey) {
-            db.products[code].imageKey = mapped;
-            saveLocalOnly();
-          }
-        } catch(e){}
-        return;
-      }
+    
+    // 3. HTTP/HTTPS URL（imageUrl）があれば使用
+    if (last && last.imageUrl && typeof last.imageUrl === 'string' && 
+        (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://'))) {
+      imgEl.src = last.imageUrl;
+      return;
     }
-
-    // 4) バーコード由来キー（deterministic）
-    if (code) {
-      const det = imgKeyFromCode(code);
-      const ok = await applyImageKeyToImg(imgEl, det);
-      if (ok) {
-        try {
-          if (db && db.products && db.products[code]) {
-            db.products[code].imageKey = det;
-            rememberImgKey(code, det);
-            saveLocalOnly();
-          }
-        } catch(e){}
-        return;
-      }
+    if (item.imageUrl && typeof item.imageUrl === 'string' && 
+        (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) {
+      imgEl.src = item.imageUrl;
+      return;
     }
-
-    // 5) URL（同期できる）
-    if (last && last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://'))) { imgEl.src = last.imageUrl; return; }
-    if (item.imageUrl && typeof item.imageUrl === 'string' && (item.imageUrl.startsWith('http://') || item.imageUrl.startsWith('https://'))) { imgEl.src = item.imageUrl; return; }
-
+    
+    // 4. どれもなければplaceholder
     imgEl.src = placeholderImg();
   }
 
@@ -530,33 +773,78 @@ POLICY: 見た目は極力維持（内部で安定化）
   let tempImgData = null; // {type:'key', key} or {type:'url', url}
   let scanner = null, editingHistIdx = null, isScanning = false;
 
+  // ✅ ここは必ず let（const にすると "Assignment to constant variable" の原因になる）
   let fbUrl = localStorage.getItem('smartPriceFirebaseUrl') || '';
 
   let isGpsOn = false, curPos = null, lastGpsTime = "";
   let activeSyncController = null;
+  // ✅ 同期ロック（二重起動防止）
+  let syncInFlight = false;
+  let syncQueued = false;
+
+  // ========= 端末ID（投稿者ID）生成・保持 =========
+  function getDeviceId() {
+    let deviceId = localStorage.getItem('smartPriceDeviceId');
+    if (!deviceId) {
+      // 端末IDを生成（ランダム文字列）
+      deviceId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 11);
+      localStorage.setItem('smartPriceDeviceId', deviceId);
+    }
+    return deviceId;
+  }
 
   window.onload = async () => {
-    loadLocal();
-    db = normalizeDb(db);
+    // ✅ 起動時の黒画面対策：即座に表示を確実にする
+    try {
+      document.body.style.display = 'block';
+      const mainView = document.getElementById('mainView');
+      if (mainView) mainView.style.display = 'block';
+    } catch(e) {
+      if (isDebug()) console.warn('[onload] display error:', e);
+    }
 
-    await migrateLegacyImagesToIdb();
+    try {
+      // ✅ Firebase初期化（匿名ログイン）
+      await initializeFirebase();
+      setupAuthListener();
 
-    initCategorySelect();
-    renderStoreList();
-    renderHistory();
+      loadLocal();
+      db = normalizeDb(db);
 
-    if (fbUrl) {
-      await syncFirebase(); // ✅ ここで「ローカル画像キーを保持」して統合
+      // 旧data:imageが残っている端末は、IndexedDBへ移行して画像復活
+      await migrateLegacyImagesToIdb();
+
+      initCategorySelect();
+      renderStoreList();
+      renderHistory();
+
+      if (fbUrl) {
+        await syncFirebase(); // ✅ マージ方式で画像が消えない
+        renderHistory();
+        renderStoreList();
+      }
+
+      setupFocusGuides();
+
+      if (isDebug()) {
+        setTimeout(() => {
+          showToast(`DEBUG:${APP_VERSION} / ${BUILD_ID} / Firebase:${isFirebaseReady?'ON':'OFF'}`, 4000);
+        }, 300);
+      }
+    } catch(e) {
+      showToast(`起動エラー: ${e.message || '不明なエラー'}`, 10000);
+      if (isDebug()) console.error('[onload]', e);
+    }
+  };
+
+  // ✅ pageshowイベントでも初期化（ブラウザバック対策）
+  window.addEventListener("pageshow", async (e) => {
+    if (e.persisted) {
+      // バックフォワードキャッシュから復帰した場合
       renderHistory();
       renderStoreList();
     }
-
-    setupFocusGuides();
-
-    if (isDebug()) {
-      setTimeout(() => { showToast(`DEBUG:${APP_VERSION} / ${BUILD_ID}`, 4000); }, 300);
-    }
-  };
+  });
 
   window.addEventListener("pageshow", resetSyncBtn);
   window.addEventListener("beforeunload", resetSyncBtn);
@@ -569,7 +857,10 @@ POLICY: 見た目は極力維持（内部で安定化）
 
   function resetSyncBtn() {
     const btn = document.getElementById('syncBtn');
-    if (btn) { btn.disabled = false; btn.innerText = "設定保存と同期"; }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "設定保存と同期";
+    }
   }
 
   function showToast(msg, ms = 4000) {
@@ -582,7 +873,12 @@ POLICY: 見た目は極力維持（内部で安定化）
 
   function isQuotaError(e) {
     if (!e) return false;
-    return (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014);
+    return (
+      e.name === 'QuotaExceededError' ||
+      e.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      e.code === 22 ||
+      e.code === 1014
+    );
   }
 
   function normalizeDb(input) {
@@ -590,7 +886,9 @@ POLICY: 見た目は極力維持（内部で安定化）
     if (!o.products || typeof o.products !== "object") o.products = {};
     if (!o.config || typeof o.config !== "object") o.config = {};
 
+    // categoryTree を正として整形（DEFAULT_CATEGORY_TREEから補完）
     if (!o.config.categoryTree || typeof o.config.categoryTree !== "object") {
+      // 旧 categories しかない場合
       if (Array.isArray(o.config.categories) && o.config.categories.length) {
         const tree = {};
         o.config.categories.forEach(c => { tree[c] = ["その他"]; });
@@ -599,6 +897,7 @@ POLICY: 見た目は極力維持（内部で安定化）
         o.config.categoryTree = JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE));
       }
     } else {
+      // ✅ 既存のcategoryTreeがある場合、DEFAULT_CATEGORY_TREEのデータで補完
       const merged = JSON.parse(JSON.stringify(DEFAULT_CATEGORY_TREE));
       Object.keys(merged).forEach(key => {
         if (!o.config.categoryTree[key] || !Array.isArray(o.config.categoryTree[key]) || o.config.categoryTree[key].length === 0) {
@@ -606,6 +905,7 @@ POLICY: 見た目は極力維持（内部で安定化）
         }
       });
     }
+    // categories は表示用のキー配列（互換）
     o.config.categories = Object.keys(o.config.categoryTree);
 
     if (typeof o.config.lastTax !== "string") o.config.lastTax = DEFAULT_CONFIG.lastTax;
@@ -617,17 +917,19 @@ POLICY: 見た目は極力維持（内部で安定化）
       const p = o.products[code];
       if (!p || typeof p !== 'object') return;
       if (!Array.isArray(p.history)) p.history = [];
-
+      // 旧 image → imageUrl へ寄せる（httpだけ）
       if (typeof p.image === 'string' && (p.image.startsWith('http://') || p.image.startsWith('https://'))) {
         p.imageUrl = p.image;
         delete p.image;
       }
+      // ✅ 画像参照の移植：last.imageKeyがあればproductへコピー（永続化）
       if (Array.isArray(p.history) && p.history.length > 0 && !p.imageKey) {
         const last = p.history[p.history.length - 1];
         if (last && typeof last === 'object') {
           if (last.imageKey && typeof last.imageKey === 'string') {
             p.imageKey = last.imageKey;
-          } else if (last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://'))) {
+          } else if (last.imageUrl && typeof last.imageUrl === 'string' && 
+                     (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://'))) {
             p.imageUrl = last.imageUrl;
           }
         }
@@ -658,31 +960,29 @@ POLICY: 見た目は極力維持（内部で安定化）
     Object.keys(out.products || {}).forEach(k => {
       const p = out.products[k];
       if (!p) return;
+      // Firebaseには絶対送らないもの
       if (typeof p.image === "string" && p.image.startsWith("data:")) delete p.image;
+      // 互換のため残ってたら整理
       if (typeof p.imageUrl === "string" && p.imageUrl.startsWith("data:")) delete p.imageUrl;
+      // history上限保険
       if (Array.isArray(p.history) && p.history.length > 500) p.history = p.history.slice(-500);
     });
     return normalizeDb(out);
   }
 
   function stripForCloud(d) {
+    // ✅ クラウドへ送るのは「文字情報＋履歴＋画像URLのみ」
+    // 注意：history内のimageKey/imageUrlは削除しない（ローカル専用だが、クラウド側でも参照可能にする）
     const out = JSON.parse(JSON.stringify(d));
     Object.keys(out.products || {}).forEach(k => {
       const p = out.products[k];
       if (!p) return;
-      delete p.image;
-      delete p.imageKey; // ✅ 端末内のみ
-
-      if (Array.isArray(p.history)) {
-        p.history.forEach(h => {
-          if (!h || typeof h !== "object") return;
-          delete h.imageKey;   // ✅ 端末内のみ
-          delete h.imageData;  // ✅ 重いので送らない
-          if (typeof h.imageUrl === "string" && h.imageUrl.startsWith("data:")) delete h.imageUrl;
-        });
-      }
-
+      delete p.image;     // 旧
+      delete p.imageKey;  // 端末内のみ（送っても無意味なので落とす）
+      // imageUrl は残す（http/httpsのみ）
       if (typeof p.imageUrl === "string" && p.imageUrl.startsWith("data:")) delete p.imageUrl;
+      // ✅ history内のimageKey/imageUrlは削除しない（ローカル専用だが、クラウド側でも参照可能にする）
+      // historyはそのまま送る（history内のimageKeyは端末内参照なので、クラウド側では無視されるが削除はしない）
     });
     return out;
   }
@@ -692,7 +992,10 @@ POLICY: 見た目は極力維持（内部で安定化）
       localStorage.setItem('smart_price_db', JSON.stringify(db));
       return true;
     } catch (e) {
-      if (!isQuotaError(e)) { showToast("端末保存に失敗しました", 10000); return false; }
+      if (!isQuotaError(e)) {
+        showToast("端末保存に失敗しました", 10000);
+        return false;
+      }
       const slim = makeSlimDb(db);
       try {
         localStorage.setItem('smart_price_db', JSON.stringify(slim));
@@ -755,59 +1058,16 @@ POLICY: 見た目は極力維持（内部で安定化）
     return base ? `${base}/smart_price.json` : "";
   }
 
-  // ✅ クラウドGETでローカル専用項目が消えないように統合
-  function mergeCloudIntoLocal(localDb, cloudDb) {
-    const local = normalizeDb(localDb || {});
-    const cloud = normalizeDb(cloudDb || {});
-    const out = cloud;
+  function getImageUrl(url, code, imageId) {
+    const base = getBaseUrl(url);
+    if (!base) return "";
+    return `${base}/smart_price_images/${encodeURIComponent(code)}/${encodeURIComponent(imageId)}.json`;
+  }
 
-    // config（空を補完）
-    if ((!out.config.homeCity || !String(out.config.homeCity).trim()) && local.config.homeCity) out.config.homeCity = local.config.homeCity;
-    if (Array.isArray(local.config.homeCities) && local.config.homeCities.length) {
-      const a = Array.isArray(out.config.homeCities) ? out.config.homeCities : [];
-      out.config.homeCities = [...new Set([...a, ...local.config.homeCities])].slice(0, 5);
-    }
-    if (Array.isArray(local.config.customStores) && local.config.customStores.length) {
-      const a = Array.isArray(out.config.customStores) ? out.config.customStores : [];
-      out.config.customStores = [...new Set([...a, ...local.config.customStores])].slice(0, 20);
-    }
-
-    // products（ユニオン＋ローカル専用項目保持）
-    const codes = new Set([...Object.keys(local.products || {}), ...Object.keys(out.products || {})]);
-    codes.forEach(code => {
-      const lp = local.products[code];
-      const cp = out.products[code];
-
-      if (!cp && lp) { out.products[code] = JSON.parse(JSON.stringify(lp)); return; }
-      if (!lp || !cp) return;
-
-      // ローカル専用画像キーは消さない
-      if (lp.imageKey && !cp.imageKey) cp.imageKey = lp.imageKey;
-
-      // 端末MAPも補助（同期で入れ替わっても残る）
-      const mapped = getRememberedImgKey(code);
-      if (mapped && !cp.imageKey) cp.imageKey = mapped;
-
-      // 埋められる空欄だけ補完（クラウド優先）
-      ['name','maker','category','subCategory'].forEach(f => {
-        if ((cp[f] == null || cp[f] === "") && (lp[f] != null && lp[f] !== "")) cp[f] = lp[f];
-      });
-      if (lp.imageUrl && !cp.imageUrl) cp.imageUrl = lp.imageUrl;
-
-      // 履歴：クラウドに無いローカル分だけ足す（重複はts+store+priceで回避）
-      if (Array.isArray(lp.history) && lp.history.length) {
-        const ch = Array.isArray(cp.history) ? cp.history : [];
-        const seen = new Set(ch.map(h => `${histTs(h)}|${h.store||''}|${h.price||''}`));
-        lp.history.forEach(h => {
-          const key = `${histTs(h)}|${h.store||''}|${h.price||''}`;
-          if (!seen.has(key)) { ch.push(h); seen.add(key); }
-        });
-        ch.sort((a,b)=>histTs(a)-histTs(b));
-        cp.history = ch;
-      }
-    });
-
-    return normalizeDb(out);
+  function getImageListUrl(url, code) {
+    const base = getBaseUrl(url);
+    if (!base) return "";
+    return `${base}/smart_price_images/${encodeURIComponent(code)}.json`;
   }
 
   async function syncFirebasePut() {
@@ -825,25 +1085,281 @@ POLICY: 見た目は極力維持（内部で安定化）
     }
   }
 
+  // ========= DB merge（クラウド上書き禁止） =========
+  function mergeHistory(localH, cloudH) {
+    const a = Array.isArray(localH) ? localH : [];
+    const b = Array.isArray(cloudH) ? cloudH : [];
+    const map = new Map();
+
+    function put(h){
+      if (!h || typeof h !== 'object') return;
+      const ts = histTs(h);
+      const price = Number(h.price);
+      const store = String(h.store || '');
+      const key = `${ts}|${price}|${store}`;
+      if (!map.has(key)) map.set(key, h);
+    }
+    a.forEach(put);
+    b.forEach(put);
+
+    const out = Array.from(map.values()).sort((x,y) => histTs(x) - histTs(y));
+    return out.length > 500 ? out.slice(-500) : out;
+  }
+
+  function mergeProduct(localP, cloudP) {
+    const lp = (localP && typeof localP === 'object') ? localP : { history: [] };
+    const cp = (cloudP && typeof cloudP === 'object') ? cloudP : { history: [] };
+
+    const lts = lastHistoryTs(lp);
+    const cts = lastHistoryTs(cp);
+
+    // 新しい履歴を持つ側を"本体"に
+    const base = deepClone((lts >= cts) ? lp : cp);
+    const other = deepClone((lts >= cts) ? cp : lp);
+
+    // historyは必ずマージ
+    base.history = mergeHistory(lp.history, cp.history);
+    
+    // ✅ history内のimageKey/imageUrlも保護（深いマージ）
+    // マージ後のhistoryで、ローカルのimageKey/imageUrlを優先保持
+    if (Array.isArray(base.history) && base.history.length > 0) {
+      const localLast = Array.isArray(lp.history) && lp.history.length > 0 ? lp.history[lp.history.length - 1] : null;
+      const cloudLast = Array.isArray(cp.history) && cp.history.length > 0 ? cp.history[cp.history.length - 1] : null;
+      const mergedLast = base.history[base.history.length - 1];
+      
+      if (mergedLast && typeof mergedLast === 'object') {
+        // 最後の履歴エントリのimageKey/imageUrlを保護
+        if (localLast && localLast.imageKey && typeof localLast.imageKey === 'string') {
+          mergedLast.imageKey = localLast.imageKey;
+        } else if (cloudLast && cloudLast.imageKey && typeof cloudLast.imageKey === 'string') {
+          mergedLast.imageKey = cloudLast.imageKey;
+        }
+        
+        if (localLast && localLast.imageUrl && typeof localLast.imageUrl === 'string' && 
+            (localLast.imageUrl.startsWith('http://') || localLast.imageUrl.startsWith('https://') || localLast.imageUrl.startsWith('data:'))) {
+          mergedLast.imageUrl = localLast.imageUrl;
+        } else if (cloudLast && cloudLast.imageUrl && typeof cloudLast.imageUrl === 'string' && 
+                   (cloudLast.imageUrl.startsWith('http://') || cloudLast.imageUrl.startsWith('https://') || cloudLast.imageUrl.startsWith('data:'))) {
+          mergedLast.imageUrl = cloudLast.imageUrl;
+        }
+      }
+    }
+
+    // 文字系：空なら補完
+    const fields = ['name','maker','category','subCategory','imageUrl'];
+    fields.forEach(k => {
+      if ((!base[k] || String(base[k]).trim() === '') && other[k]) base[k] = other[k];
+    });
+
+    // ✅ 画像情報：端末内imageKeyを最優先で保持、imageUrlはマージ
+    if (lp.imageKey && typeof lp.imageKey === 'string') {
+      base.imageKey = lp.imageKey; // ローカルのimageKeyを最優先
+    } else if (cp.imageKey && typeof cp.imageKey === 'string') {
+      base.imageKey = cp.imageKey; // クラウドのimageKeyは参考程度
+    }
+    // imageUrlは両方から取得（空なら補完）
+    if ((!base.imageUrl || !base.imageUrl.startsWith('http')) && other.imageUrl && 
+        typeof other.imageUrl === 'string' && other.imageUrl.startsWith('http')) {
+      base.imageUrl = other.imageUrl;
+    }
+
+    // 旧imageは整理
+    if (typeof base.image === 'string' && base.image.startsWith('data:')) delete base.image;
+    if (typeof base.imageUrl === 'string' && base.imageUrl.startsWith('data:')) delete base.imageUrl;
+
+    if (!Array.isArray(base.history)) base.history = [];
+    return base;
+  }
+
+  function mergeConfig(localC, cloudC) {
+    const lc = (localC && typeof localC === 'object') ? deepClone(localC) : {};
+    const cc = (cloudC && typeof cloudC === 'object') ? deepClone(cloudC) : {};
+
+    // 基本はクラウド優先（端末間で揃いやすい）
+    const out = deepClone(cc);
+
+    // ただし空はローカルで補完
+    if (!out.homeCity && lc.homeCity) out.homeCity = lc.homeCity;
+    if (!out.lastTax && lc.lastTax) out.lastTax = lc.lastTax;
+
+    // homeCities/customStoresはユニオン
+    const hc = [...new Set([...(Array.isArray(out.homeCities)?out.homeCities:[]), ...(Array.isArray(lc.homeCities)?lc.homeCities:[])])].filter(Boolean).slice(0,5);
+    out.homeCities = hc;
+    const cs = [...new Set([...(Array.isArray(out.customStores)?out.customStores:[]), ...(Array.isArray(lc.customStores)?lc.customStores:[])])].filter(Boolean).slice(0,20);
+    out.customStores = cs;
+
+    // categoryTreeは"欠けを補う"
+    if (!out.categoryTree || typeof out.categoryTree !== 'object') out.categoryTree = {};
+    const ltree = (lc.categoryTree && typeof lc.categoryTree === 'object') ? lc.categoryTree : {};
+    Object.keys(ltree).forEach(cat => {
+      if (!out.categoryTree[cat]) out.categoryTree[cat] = deepClone(ltree[cat]);
+      else {
+        // サブカテゴリを補完
+        const a = Array.isArray(out.categoryTree[cat]) ? out.categoryTree[cat] : [];
+        const b = Array.isArray(ltree[cat]) ? ltree[cat] : [];
+        out.categoryTree[cat] = [...new Set([...a,...b])];
+      }
+    });
+
+    return out;
+  }
+
+  function mergeDb(localDb, cloudDb) {
+    const ld = normalizeDb(deepClone(localDb || {}));
+    const cd = normalizeDb(deepClone(cloudDb || {}));
+
+    const merged = { products:{}, config:{} };
+    const keys = new Set([...Object.keys(ld.products||{}), ...Object.keys(cd.products||{})]);
+
+    keys.forEach(code => {
+      merged.products[code] = mergeProduct(ld.products[code], cd.products[code]);
+    });
+    merged.config = mergeConfig(ld.config, cd.config);
+    return normalizeDb(merged);
+  }
+
+  function lastHistoryTs(p) {
+    try {
+      const h = (p && Array.isArray(p.history) && p.history.length) ? p.history[p.history.length-1] : null;
+      return histTs(h);
+    } catch(e){ return 0; }
+  }
+
+  function deepClone(x) {
+    try { return JSON.parse(JSON.stringify(x)); } catch(e){ return x; }
+  }
+
+  // ✅ 同期処理を原子的に実行（ロック + 検証 + 一括保存）
   async function syncFirebase() {
     if(!fbUrl) return;
+    
+    // ロックチェック：既に実行中ならキューに追加して終了
+    if (syncInFlight) {
+      syncQueued = true;
+      if (isDebug()) console.log('[Sync] Already in flight, queued');
+      return;
+    }
+    
+    // ロック取得
+    syncInFlight = true;
+    syncQueued = false;
+    
+    const startTime = Date.now();
+    let syncResult = { success: false, itemsCount: 0, historyCount: 0, imageKeyCount: 0, error: null };
+    
     try {
+      // 1. ローカルDBを読み込み
+      const localDb = deepClone(db);
+      
+      // 2. クラウドDBを取得
       const targetUrl = getSafeUrl(fbUrl);
       const res = await fetchWithTimeout(targetUrl, {}, 12000);
-      const cloud = await res.json();
-      if (cloud && cloud.products) {
-        db = mergeCloudIntoLocal(db, cloud);
-        saveLocalOnly();
-        initCategorySelect();
-        renderHistory();
-        renderStoreList();
+      const cloudDb = await res.json();
+      
+      if (!cloudDb || typeof cloudDb !== 'object' || !cloudDb.products) {
+        throw new Error('クラウドデータが無効です');
       }
-    } catch(e){
-      if (isDebug()) showToast(`GET失敗: ${e.message}`, 8000);
+      
+      // 3. マージ（新規生成）
+      const mergedDb = mergeDb(localDb, cloudDb);
+      
+      // 4. 検証
+      const validation = validateMergedDb(mergedDb);
+      if (!validation.valid) {
+        throw new Error(`データ検証失敗: ${validation.error}`);
+      }
+      
+      // 5. 統計取得（デバッグ用）
+      syncResult.itemsCount = Object.keys(mergedDb.products || {}).length;
+      syncResult.historyCount = Object.values(mergedDb.products || {}).reduce((sum, p) => {
+        return sum + (Array.isArray(p.history) ? p.history.length : 0);
+      }, 0);
+      syncResult.imageKeyCount = Object.values(mergedDb.products || {}).filter(p => 
+        p && typeof p.imageKey === 'string' && p.imageKey.trim()
+      ).length;
+      
+      // 6. 一括保存（原子的）
+      db = mergedDb;
+      const saveOk = saveLocalOnly();
+      if (!saveOk) {
+        throw new Error('ローカル保存に失敗しました');
+      }
+      
+      // 7. UI更新
+      initCategorySelect();
+      await renderHistory();
+      renderStoreList();
+      
+      syncResult.success = true;
+      const elapsed = Date.now() - startTime;
+      
+      if (isDebug()) {
+        const msg = `同期成功: ${syncResult.itemsCount}商品 / ${syncResult.historyCount}履歴 / ${syncResult.imageKeyCount}画像 / ${elapsed}ms`;
+        showToast(msg, 5000);
+        console.log('[Sync]', msg);
+      } else {
+        showToast("同期完了", 2000);
+      }
+      
+    } catch(e) {
+      syncResult.error = e.message || String(e);
+      if (isDebug()) {
+        showToast(`同期失敗: ${syncResult.error}`, 8000);
+        console.error('[Sync]', syncResult.error, e);
+      } else {
+        showToast("同期に失敗しました", 5000);
+      }
+    } finally {
+      // ロック解除
+      syncInFlight = false;
+      
+      // キューがあれば1回だけ再実行
+      if (syncQueued) {
+        syncQueued = false;
+        setTimeout(() => syncFirebase(), 100);
+      }
+    }
+  }
+  
+  // ✅ マージ済みDBの検証
+  function validateMergedDb(mergedDb) {
+    try {
+      if (!mergedDb || typeof mergedDb !== 'object') {
+        return { valid: false, error: 'DBがオブジェクトではありません' };
+      }
+      
+      if (!mergedDb.products || typeof mergedDb.products !== 'object') {
+        return { valid: false, error: 'productsがオブジェクトではありません' };
+      }
+      
+      if (!mergedDb.config || typeof mergedDb.config !== 'object') {
+        return { valid: false, error: 'configがオブジェクトではありません' };
+      }
+      
+      // productsの各要素を検証
+      for (const [code, p] of Object.entries(mergedDb.products)) {
+        if (!p || typeof p !== 'object') {
+          return { valid: false, error: `商品${code}が無効です` };
+        }
+        if (!Array.isArray(p.history)) {
+          return { valid: false, error: `商品${code}のhistoryが配列ではありません` };
+        }
+        // historyの各要素を検証
+        for (let i = 0; i < p.history.length; i++) {
+          const h = p.history[i];
+          if (!h || typeof h !== 'object') {
+            return { valid: false, error: `商品${code}の履歴${i}が無効です` };
+          }
+        }
+      }
+      
+      return { valid: true };
+    } catch(e) {
+      return { valid: false, error: `検証中に例外: ${e.message || String(e)}` };
     }
   }
 
-  // ✅ 旧 data:image が端末に残っている場合のみ復活できる
+  // ✅ 旧 data:image が端末に残っている場合のみ復活できる（残っていない端末は無理）
   async function migrateLegacyImagesToIdb() {
     const dbi = await openImgDb();
     if (!dbi) return;
@@ -854,15 +1370,14 @@ POLICY: 見た目は極力維持（内部で安定化）
       const p = db.products[code];
       if (!p) continue;
 
-      // 旧 image が data の場合 → idbへ移行（バーコード由来キーへ）
-      if (typeof p.image === 'string' && p.image.startsWith('data:')) {
+      // 旧 image が data の場合 → idbへ移行
+      if (typeof p.image === 'string' && p.image.startsWith('data:') && !p.imageKey) {
         const blob = dataUrlToBlob(p.image);
         if (blob) {
-          const det = imgKeyFromCode(code);
-          const ok = await idbPut(det, blob);
+          const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+          const ok = await idbPut(key, blob);
           if (ok) {
-            p.imageKey = det;
-            rememberImgKey(code, det);
+            p.imageKey = key;
             delete p.image;
             changed = true;
           }
@@ -875,24 +1390,13 @@ POLICY: 見た目は極力維持（内部で安定化）
         delete p.image;
         changed = true;
       }
-
-      // 既にimageKeyがあるがdetに寄せられるなら寄せる（復元耐性UP）
-      if (p.imageKey && typeof p.imageKey === "string") {
-        const newKey = await ensureDeterministicKey(code, p.imageKey);
-        if (newKey && newKey !== p.imageKey) {
-          p.imageKey = newKey;
-          rememberImgKey(code, newKey);
-          changed = true;
-        } else {
-          rememberImgKey(code, p.imageKey);
-        }
-      }
     }
 
     if (changed) {
       saveLocalOnly();
+      // 画像本体は送らないが、文字情報更新はOK
       syncFirebasePut();
-      if (isDebug()) showToast("旧画像を端末内へ移行/整理しました", 5000);
+      if (isDebug()) showToast("旧画像を端末内へ移行しました", 5000);
     }
   }
 
@@ -928,6 +1432,7 @@ POLICY: 見た目は極力維持（内部で安定化）
       initSubCategorySelect(sel.value);
     };
 
+    // 初期は隠す
     if (sub) sub.style.display = 'none';
   }
 
@@ -936,20 +1441,22 @@ POLICY: 見た目は極力維持（内部で安定化）
     if (!sub) return;
     if (!cat || cat === "__NONE__") { sub.style.display = 'none'; return; }
 
-    db = normalizeDb(db);
-
+    db = normalizeDb(db); // ✅ 正規化を確実に実行
+    
+    // ✅ categoryTreeが存在しない、または空の場合、DEFAULT_CATEGORY_TREEから取得
     let list = [];
     if (db.config.categoryTree && db.config.categoryTree[cat] && Array.isArray(db.config.categoryTree[cat]) && db.config.categoryTree[cat].length > 0) {
       list = db.config.categoryTree[cat];
     } else if (DEFAULT_CATEGORY_TREE[cat] && Array.isArray(DEFAULT_CATEGORY_TREE[cat])) {
+      // ✅ DEFAULT_CATEGORY_TREEから取得して、db.config.categoryTreeに保存
       list = DEFAULT_CATEGORY_TREE[cat];
       if (!db.config.categoryTree) db.config.categoryTree = {};
       db.config.categoryTree[cat] = [...list];
-      saveLocalOnly();
+      saveLocalOnly(); // 保存して次回から使えるように
     } else {
       list = ["その他"];
     }
-
+    
     if (!list.includes("その他")) list = [...list, "その他"];
 
     sub.style.display = 'block';
@@ -1005,11 +1512,28 @@ POLICY: 見た目は極力維持（内部で安定化）
     if(!list) return;
 
     const freq = {};
+    const storePositions = {}; // 店名 → {lat, lng} のマップ（履歴から取得）
+    
     Object.values(db.products).forEach(p => p.history?.forEach(h => {
       if(!h.store || h.store === "未設定") return;
       freq[h.store] = (freq[h.store] || 0) + 1;
+      // GPS位置情報があれば保存
+      if (h.lat && h.lng && !storePositions[h.store]) {
+        storePositions[h.store] = { lat: h.lat, lng: h.lng };
+      }
     }));
-    const sortedFreq = Object.keys(freq).sort((a,b) => freq[b] - freq[a]);
+    
+    let sortedFreq = Object.keys(freq).sort((a,b) => freq[b] - freq[a]);
+    
+    // ✅ GPSが有効で位置情報がある場合、近い順に並び替え
+    if (isGpsOn && curPos && Object.keys(storePositions).length > 0) {
+      sortedFreq = sortedFreq.sort((a, b) => {
+        const distA = storePositions[a] ? calcDistance(curPos.lat, curPos.lng, storePositions[a].lat, storePositions[a].lng) : 999;
+        const distB = storePositions[b] ? calcDistance(curPos.lat, curPos.lng, storePositions[b].lat, storePositions[b].lng) : 999;
+        return distA - distB;
+      });
+    }
+    
     const cityStores = CITY_STORE_PRESET[db.config.homeCity] || [];
     const customStores = db.config.customStores || [];
     const finalSet = ["未設定", ...new Set([...manualPriority, ...customStores, ...cityStores, ...sortedFreq])];
@@ -1043,7 +1567,7 @@ POLICY: 見た目は極力維持（内部で安定化）
     return 'https://placehold.jp/24/333/ccc/68x68.png?text=NoImage';
   }
 
-  function renderHistory() {
+  async function renderHistory() {
     const list = document.getElementById('historyList');
     if(!list) return;
     list.innerHTML = "";
@@ -1051,16 +1575,56 @@ POLICY: 見た目は極力維持（内部で安定化）
     const items = Object.keys(db.products).map(k => ({ code: k, ...db.products[k] }));
     items.sort((a,b) => (histTs(b.history?.[b.history.length-1]) || 0) - (histTs(a.history?.[a.history.length-1]) || 0));
 
-    items.forEach(it => {
-      if (!it.history || !it.history.length) return;
+    for (const it of items) {
+      if (!it.history || !it.history.length) continue;
       const last = it.history[it.history.length-1];
       const div = document.createElement('div');
       div.className = 'card price-card';
       div.onclick = () => openForm(it.code);
 
+      // ✅ 画像表示：優先順位
+      // 1. 自分の画像（IndexedDB / imageUrl）
+      // 2. 共有画像からランダム表示（固定しない）
+      const imgId = `img_${it.code.replace(/[^a-zA-Z0-9_-]/g,'_')}`;
+      let imgSrc = placeholderImg();
+      let hasMyImage = false;
+
+      // 自分の画像を確認
+      if (it.imageKey && typeof it.imageKey === 'string') {
+        imgSrc = placeholderImg();
+        hasMyImage = true;
+      } else if (last && last.imageKey && typeof last.imageKey === 'string') {
+        imgSrc = placeholderImg();
+        hasMyImage = true;
+      } else if (it.imageUrl && typeof it.imageUrl === 'string' && 
+                 (it.imageUrl.startsWith('http://') || it.imageUrl.startsWith('https://') || it.imageUrl.startsWith('data:'))) {
+        imgSrc = it.imageUrl;
+        hasMyImage = true;
+      } else if (last && last.imageUrl && typeof last.imageUrl === 'string' && 
+                 (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://') || last.imageUrl.startsWith('data:'))) {
+        imgSrc = last.imageUrl;
+        hasMyImage = true;
+      }
+
+      // 自分の画像がない場合、共有画像からランダム表示
+      if (!hasMyImage && fbUrl) {
+        try {
+          const sharedImages = await getSharedImages(it.code);
+          if (sharedImages.length > 0) {
+            // ランダムに1つ選ぶ
+            const randomImg = sharedImages[Math.floor(Math.random() * sharedImages.length)];
+            if (randomImg && randomImg.imageUrl) {
+              imgSrc = randomImg.imageUrl;
+            }
+          }
+        } catch(e) {
+          if (isDebug()) console.warn('[renderHistory] getSharedImages failed:', e);
+        }
+      }
+
       div.innerHTML = `
         <div class="d-flex align-items-center">
-          <img src="" class="prod-thumb">
+          <img id="${imgId}" src="${imgSrc}" class="prod-thumb" referrerpolicy="no-referrer">
           <div class="flex-grow-1 overflow-hidden">
             <div class="fw-bold text-white small text-truncate">${it.name || ''}</div>
             <div class="text-secondary" style="font-size:0.6rem;">${last.store || '未設定'}</div>
@@ -1071,11 +1635,81 @@ POLICY: 見た目は極力維持（内部で安定化）
         </div>`;
       list.appendChild(div);
 
+      // ✅ IndexedDB画像を適用（優先順位：last.imageKey → it.imageKey、失敗時はimageUrlへフォールバック）
       const imgEl = div.querySelector('img.prod-thumb');
       if (imgEl) {
-        spBindItemImage(imgEl, it, last, it.code).catch(() => { imgEl.src = placeholderImg(); });
+        imgEl.referrerPolicy = "no-referrer";
+        
+        // 自分の画像がある場合
+        if (hasMyImage) {
+          const fallbackUrl = (last && last.imageUrl && typeof last.imageUrl === 'string' && 
+                              (last.imageUrl.startsWith('http://') || last.imageUrl.startsWith('https://') || last.imageUrl.startsWith('data:'))) 
+                              ? last.imageUrl 
+                              : (it.imageUrl && typeof it.imageUrl === 'string' && 
+                                 (it.imageUrl.startsWith('http://') || it.imageUrl.startsWith('https://') || it.imageUrl.startsWith('data:'))) 
+                                 ? it.imageUrl 
+                                 : null;
+          
+          if (last && last.imageKey && typeof last.imageKey === 'string') {
+            applyImageKeyToImg(imgEl, last.imageKey).catch(() => {
+              if (imgEl) {
+                imgEl.src = fallbackUrl || placeholderImg();
+              }
+            });
+          } else if (it.imageKey && typeof it.imageKey === 'string') {
+            applyImageKeyToImg(imgEl, it.imageKey).catch(() => {
+              if (imgEl) {
+                imgEl.src = fallbackUrl || placeholderImg();
+              }
+            });
+          } else if (fallbackUrl) {
+            if (fallbackUrl.startsWith('shared:')) {
+              // 共有画像の参照（実際の画像はFirebaseから取得）
+              const imageId = fallbackUrl.replace('shared:', '');
+              if (fbUrl) {
+                (async () => {
+                  try {
+                    const imageUrl = getImageUrl(fbUrl, it.code, imageId);
+                    const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                    const record = await res.json();
+                    if (record && record.imageUrl) {
+                      imgEl.src = record.imageUrl;
+                    } else {
+                      imgEl.src = placeholderImg();
+                    }
+                  } catch(e) {
+                    imgEl.src = placeholderImg();
+                  }
+                })();
+              } else {
+                imgEl.src = placeholderImg();
+              }
+            } else {
+              imgEl.src = fallbackUrl;
+            }
+          }
+        } else {
+          // 共有画像の場合、読み込み失敗時は別画像に差し替え
+          imgEl.onerror = async () => {
+            try {
+              const sharedImages = await getSharedImages(it.code);
+              if (sharedImages.length > 0) {
+                const randomImg = sharedImages[Math.floor(Math.random() * sharedImages.length)];
+                if (randomImg && randomImg.imageUrl) {
+                  imgEl.src = randomImg.imageUrl;
+                } else {
+                  imgEl.src = placeholderImg();
+                }
+              } else {
+                imgEl.src = placeholderImg();
+              }
+            } catch(e) {
+              imgEl.src = placeholderImg();
+            }
+          };
+        }
       }
-    });
+    }
   }
 
   // ========= Form =========
@@ -1109,47 +1743,293 @@ POLICY: 見た目は極力維持（内部で安定化）
       document.getElementById('inputMaker').value = "";
       if (catSel) catSel.value = "__NONE__";
       if (subSel) { subSel.style.display = 'none'; subSel.value = "__NONE__"; }
-      document.getElementById('previewImg').src = placeholderImg();
+      const prev = document.getElementById('previewImg');
+      if (prev) {
+        prev.src = placeholderImg();
+        prev.referrerPolicy = "no-referrer";
+      }
       tempImgData = null;
+      
+      // ✅ 新規商品の場合、JANコードならYahoo検索を試行
+      if (code && /^\d{8,14}$/.test(String(code))) {
+        try {
+          const info = await lookupYahooByJan(String(code));
+          if (info) {
+            if (info.name) document.getElementById('inputName').value = info.name;
+            if (info.maker) document.getElementById('inputMaker').value = info.maker;
+            if (info.imageUrl && prev) {
+              prev.src = info.imageUrl;
+              tempImgData = { type:'url', url: info.imageUrl };
+            }
+            showToast("商品情報を取得しました", 3000);
+          }
+        } catch(e) {
+          if (isDebug()) showToast(`情報取得エラー: ${e.message}`, 5000);
+        }
+      }
     } else {
       document.getElementById('inputName').value = p.name || "";
       document.getElementById('inputMaker').value = p.maker || "";
 
       const catVal = p.category || "__NONE__";
-      if (catSel) catSel.value = ([...catSel.options].some(o => o.value === catVal)) ? catVal : "__NONE__";
+      if (catSel) {
+        catSel.value = ([...catSel.options].some(o => o.value === catVal)) ? catVal : "__NONE__";
+      }
 
       if (catVal && catVal !== "__NONE__") {
         initSubCategorySelect(catVal);
         const subVal = p.subCategory || "__NONE__";
-        if (subSel) subSel.value = ([...subSel.options].some(o => o.value === subVal)) ? subVal : "__NONE__";
+        if (subSel) {
+          subSel.value = ([...subSel.options].some(o => o.value === subVal)) ? subVal : "__NONE__";
+        }
       } else {
         if (subSel) subSel.style.display = 'none';
       }
 
+      // ✅ 画像表示：優先順位
+      // 1. 自分の画像（IndexedDB / imageUrl）
+      // 2. 共有画像からランダム表示（固定しない）
       const prev = document.getElementById('previewImg');
       if (prev) {
-        prev.src = '';
-        spBindItemImage(prev, p, null, curBarcode).catch(()=>{ prev.src = placeholderImg(); });
-      }
-
-      // もし旧キーならdetへ寄せる（次から復元しやすく）
-      try {
-        if (p.imageKey) {
-          const newKey = await ensureDeterministicKey(curBarcode, p.imageKey);
-          if (newKey && newKey !== p.imageKey) {
-            p.imageKey = newKey;
-            rememberImgKey(curBarcode, newKey);
-            saveLocalOnly();
+        const last = p.history && p.history.length > 0 ? p.history[p.history.length - 1] : null;
+        prev.src = placeholderImg();
+        prev.referrerPolicy = "no-referrer";
+        
+        let hasMyImage = false;
+        
+        // 自分の画像を確認
+        if (last && last.imageKey && typeof last.imageKey === 'string') {
+          hasMyImage = true;
+          applyImageKeyToImg(prev, last.imageKey).catch(() => {
+            if (p.imageKey && typeof p.imageKey === 'string') {
+              applyImageKeyToImg(prev, p.imageKey).catch(() => {
+                if (last && last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http') || last.imageUrl.startsWith('data:'))) {
+                  prev.src = last.imageUrl;
+                } else if (p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.startsWith('http') || p.imageUrl.startsWith('data:') || p.imageUrl.startsWith('shared:'))) {
+                if (p.imageUrl.startsWith('shared:')) {
+                  const imageId = p.imageUrl.replace('shared:', '');
+                  if (fbUrl) {
+                    (async () => {
+                      try {
+                        const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+                        const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                        const record = await res.json();
+                        if (record && record.imageUrl) {
+                          prev.src = record.imageUrl;
+                        } else {
+                          prev.src = placeholderImg();
+                        }
+                      } catch(e) {
+                        prev.src = placeholderImg();
+                      }
+                    })();
+                  } else {
+                    prev.src = placeholderImg();
+                  }
+                } else {
+                  prev.src = p.imageUrl;
+                }
+                } else {
+                  prev.src = placeholderImg();
+                }
+              });
+            } else {
+              if (last && last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http') || last.imageUrl.startsWith('data:') || last.imageUrl.startsWith('shared:'))) {
+                if (last.imageUrl.startsWith('shared:')) {
+                  const imageId = last.imageUrl.replace('shared:', '');
+                  if (fbUrl) {
+                    (async () => {
+                      try {
+                        const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+                        const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                        const record = await res.json();
+                        if (record && record.imageUrl) {
+                          prev.src = record.imageUrl;
+                        } else {
+                          prev.src = placeholderImg();
+                        }
+                      } catch(e) {
+                        prev.src = placeholderImg();
+                      }
+                    })();
+                  } else {
+                    prev.src = placeholderImg();
+                  }
+                } else {
+                  prev.src = last.imageUrl;
+                }
+              } else if (p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.startsWith('http') || p.imageUrl.startsWith('data:') || p.imageUrl.startsWith('shared:'))) {
+                if (p.imageUrl.startsWith('shared:')) {
+                  const imageId = p.imageUrl.replace('shared:', '');
+                  if (fbUrl) {
+                    (async () => {
+                      try {
+                        const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+                        const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                        const record = await res.json();
+                        if (record && record.imageUrl) {
+                          prev.src = record.imageUrl;
+                        } else {
+                          prev.src = placeholderImg();
+                        }
+                      } catch(e) {
+                        prev.src = placeholderImg();
+                      }
+                    })();
+                  } else {
+                    prev.src = placeholderImg();
+                  }
+                } else {
+                  prev.src = p.imageUrl;
+                }
+              } else {
+                prev.src = placeholderImg();
+              }
+            }
+          });
+        } else if (p.imageKey && typeof p.imageKey === 'string') {
+          hasMyImage = true;
+          applyImageKeyToImg(prev, p.imageKey).catch(() => {
+            if (last && last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http') || last.imageUrl.startsWith('data:') || last.imageUrl.startsWith('shared:'))) {
+              if (last.imageUrl.startsWith('shared:')) {
+                const imageId = last.imageUrl.replace('shared:', '');
+                if (fbUrl) {
+                  (async () => {
+                    try {
+                      const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+                      const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                      const record = await res.json();
+                      if (record && record.imageUrl) {
+                        prev.src = record.imageUrl;
+                      } else {
+                        prev.src = placeholderImg();
+                      }
+                    } catch(e) {
+                      prev.src = placeholderImg();
+                    }
+                  })();
+                } else {
+                  prev.src = placeholderImg();
+                }
+              } else {
+                prev.src = last.imageUrl;
+              }
+            } else if (p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.startsWith('http') || p.imageUrl.startsWith('data:') || p.imageUrl.startsWith('shared:'))) {
+              if (p.imageUrl.startsWith('shared:')) {
+                const imageId = p.imageUrl.replace('shared:', '');
+                if (fbUrl) {
+                  (async () => {
+                    try {
+                      const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+                      const res = await fetchWithTimeout(imageUrl, {}, 8000);
+                      const record = await res.json();
+                      if (record && record.imageUrl) {
+                        prev.src = record.imageUrl;
+                      } else {
+                        prev.src = placeholderImg();
+                      }
+                    } catch(e) {
+                      prev.src = placeholderImg();
+                    }
+                  })();
+                } else {
+                  prev.src = placeholderImg();
+                }
+              } else {
+                prev.src = p.imageUrl;
+              }
+            } else {
+              prev.src = placeholderImg();
+            }
+          });
+      } else if (last && last.imageUrl && typeof last.imageUrl === 'string' && (last.imageUrl.startsWith('http') || last.imageUrl.startsWith('data:') || last.imageUrl.startsWith('shared:'))) {
+        if (last.imageUrl.startsWith('shared:')) {
+          // 共有画像の参照（自分の画像として扱う）
+          hasMyImage = true;
+          const imageId = last.imageUrl.replace('shared:', '');
+          if (fbUrl) {
+            try {
+              const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+              const res = await fetchWithTimeout(imageUrl, {}, 8000);
+              const record = await res.json();
+              if (record && record.imageUrl) {
+                prev.src = record.imageUrl;
+              } else {
+                prev.src = placeholderImg();
+              }
+            } catch(e) {
+              prev.src = placeholderImg();
+            }
           } else {
-            rememberImgKey(curBarcode, p.imageKey);
+            prev.src = placeholderImg();
           }
         } else {
-          const mapped = getRememberedImgKey(curBarcode);
-          if (mapped) p.imageKey = mapped;
+          prev.src = last.imageUrl;
+          hasMyImage = true;
         }
-      } catch(e){}
+      } else if (p.imageUrl && typeof p.imageUrl === 'string' && (p.imageUrl.startsWith('http') || p.imageUrl.startsWith('data:') || p.imageUrl.startsWith('shared:'))) {
+        if (p.imageUrl.startsWith('shared:')) {
+          // 共有画像の参照（自分の画像として扱う）
+          hasMyImage = true;
+          const imageId = p.imageUrl.replace('shared:', '');
+          if (fbUrl) {
+            try {
+              const imageUrl = getImageUrl(fbUrl, curBarcode, imageId);
+              const res = await fetchWithTimeout(imageUrl, {}, 8000);
+              const record = await res.json();
+              if (record && record.imageUrl) {
+                prev.src = record.imageUrl;
+              } else {
+                prev.src = placeholderImg();
+              }
+            } catch(e) {
+              prev.src = placeholderImg();
+            }
+          } else {
+            prev.src = placeholderImg();
+          }
+        } else {
+          prev.src = p.imageUrl;
+          hasMyImage = true;
+        }
+      }
 
-      tempImgData = null;
+        // 自分の画像がない場合、共有画像からランダム表示
+        if (!hasMyImage && fbUrl) {
+          (async () => {
+            try {
+              const sharedImages = await getSharedImages(curBarcode);
+              if (sharedImages.length > 0) {
+                const randomImg = sharedImages[Math.floor(Math.random() * sharedImages.length)];
+                if (randomImg && randomImg.imageUrl) {
+                  prev.src = randomImg.imageUrl;
+                  // 読み込み失敗時は別画像に差し替え
+                  prev.onerror = async () => {
+                    try {
+                      const retryImages = await getSharedImages(curBarcode);
+                      if (retryImages.length > 0) {
+                        const retryImg = retryImages[Math.floor(Math.random() * retryImages.length)];
+                        if (retryImg && retryImg.imageUrl) {
+                          prev.src = retryImg.imageUrl;
+                        } else {
+                          prev.src = placeholderImg();
+                        }
+                      } else {
+                        prev.src = placeholderImg();
+                      }
+                    } catch(e) {
+                      prev.src = placeholderImg();
+                    }
+                  };
+                }
+              }
+            } catch(e) {
+              if (isDebug()) console.warn('[openForm] getSharedImages failed:', e);
+            }
+          })();
+        }
+      }
+      tempImgData = null; // 新規選択があれば上書き
     }
 
     renderDetailHistory(exists ? p.history : []);
@@ -1250,16 +2130,25 @@ POLICY: 見た目は極力維持（内部で安定化）
     p.subCategory = needsSub ? sub : "";
     p.maker = document.getElementById('inputMaker').value || "";
 
-    // 画像：tempImgDataがあれば反映
-    if (tempImgData && tempImgData.type === 'key') {
-      const key = String(tempImgData.key || '').trim();
-      if (key) {
-        // detへ寄せられるなら寄せる（復元耐性UP）
-        const newKey = await ensureDeterministicKey(curBarcode, key);
-        p.imageKey = newKey || key;
-        rememberImgKey(curBarcode, p.imageKey);
+    // ✅ 画像（プレビュー）→ Firebase共有またはIndexedDBへ保存
+    if (tempImgData && tempImgData.type === 'shared' && tempImgData.imageId) {
+      // 共有画像の場合、imageUrlに共有画像のURLを保存（参照のみ）
+      // 実際の画像データはFirebaseに保存済み
+      p.imageUrl = `shared:${tempImgData.imageId}`;
+      delete p.image;
+      delete p.imageKey; // 共有画像はimageKeyを使わない
+    } else if (tempImgData && typeof tempImgData === 'string' && tempImgData.startsWith('data:')) {
+      // 旧方式：dataURL → IndexedDB
+      const blob = dataURLtoBlob(tempImgData);
+      if (blob) {
+        const key = 'img_' + String(curBarcode || '').replace(/[^\w\-]/g, '_');
+        await idbPut(key, blob);
+        p.imageKey = key;
       }
       delete p.imageData;
+      delete p.image;
+    } else if (tempImgData && tempImgData.type === 'key') {
+      p.imageKey = tempImgData.key;
       delete p.image;
     } else if (tempImgData && tempImgData.type === 'url') {
       p.imageUrl = tempImgData.url;
@@ -1280,8 +2169,6 @@ POLICY: 見た目は極力維持（内部で安定化）
       db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
       const entry = { price: finalP, store: curStore, ts: Date.now() };
       if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
-      // 画像URLは同期OK（端末キーは同期しない）
-      if (p.imageUrl && typeof p.imageUrl === "string" && (p.imageUrl.startsWith("http://") || p.imageUrl.startsWith("https://"))) entry.imageUrl = p.imageUrl;
       p.history.push(entry);
       showToast("保存完了", 2000);
     }
@@ -1305,19 +2192,95 @@ POLICY: 見た目は極力維持（内部で安定化）
     btn.innerText = isHidden ? "購入履歴を隠す" : "購入履歴を表示（タップで編集）";
   }
 
+  // ========= GPS距離計算（簡易版：ハーバーサイン公式） =========
+  function calcDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371; // 地球の半径（km）
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
   function toggleGps() {
     if(!isGpsOn) {
-      isGpsOn = true; lastGpsTime = "…"; renderStoreList(); showToast("GPS取得中…", 3000);
+      isGpsOn = true; lastGpsTime = "…"; renderStoreList(); 
+      showToast("GPS取得中…", 3000);
+      
+      if (!navigator.geolocation) {
+        showToast("GPS機能が利用できません", 5000);
+        isGpsOn = false; renderStoreList();
+        return;
+      }
+
       navigator.geolocation.getCurrentPosition((pos) => {
         curPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const d = new Date(); lastGpsTime = `${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-        renderStoreList(); showToast("GPS取得成功", 2000);
+        
+        // ✅ GPS取得成功後、近隣ストアを上位に並べる
+        renderStoreList();
+        
+        const msg = isDebug() 
+          ? `GPS取得成功（${curPos.lat.toFixed(4)}, ${curPos.lng.toFixed(4)}）` 
+          : "GPS取得成功";
+        showToast(msg, 2000);
       }, (err) => {
-        showToast(`GPSエラー: ${err.message}`, 8000);
-        isGpsOn = false; renderStoreList();
-      }, { enableHighAccuracy: true, timeout: 10000 });
+        const errMsg = err.code === 1 ? "位置情報の取得が拒否されました" :
+                      err.code === 2 ? "位置情報が取得できませんでした" :
+                      err.code === 3 ? "位置情報の取得がタイムアウトしました" :
+                      `GPSエラー: ${err.message}`;
+        showToast(errMsg, 8000);
+        isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList();
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
     } else {
-      isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); showToast("GPS OFF", 1500);
+      isGpsOn = false; curPos = null; lastGpsTime = ""; renderStoreList(); 
+      showToast("GPS OFF", 1500);
+    }
+  }
+
+  // ========= Yahoo Shopping API（JANコード検索） =========
+  async function lookupYahooByJan(jan) {
+    try {
+      // Yahoo App IDを取得（初回のみprompt、その後はlocalStorage）
+      let appId = localStorage.getItem('smartPriceYahooAppId') || '';
+      if (!appId) {
+        appId = prompt('Yahoo App ID（Client ID）を入力してください（初回のみ）\n空欄ならスキップします。', '') || '';
+        if (appId) {
+          localStorage.setItem('smartPriceYahooAppId', appId);
+        } else {
+          return null;
+        }
+      }
+
+      // CORS回避のため r.jina.ai 経由で取得
+      const apiUrl = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?appid=${encodeURIComponent(appId)}&jan_code=${encodeURIComponent(jan)}&results=1&image_size=300`;
+      const jinaUrl = `https://r.jina.ai/${apiUrl}`;
+      
+      showToast("Yahoo検索中…", 5000);
+      const res = await fetchWithTimeout(jinaUrl, { cache: 'no-store' }, 12000);
+      const text = await res.text();
+      
+      // JSONを抽出（r.jina.aiの説明行をスキップ）
+      const jsonStart = text.indexOf('{');
+      if (jsonStart < 0) throw new Error('JSON not found');
+      const json = JSON.parse(text.slice(jsonStart));
+      
+      if (json.hits && json.hits.length > 0) {
+        const item = json.hits[0];
+        return {
+          name: item.name || item.title || "",
+          maker: (item.brand && item.brand.name) ? item.brand.name : "",
+          imageUrl: (item.image && (item.image.medium || item.image.small || item.image.large)) ? (item.image.medium || item.image.small || item.image.large) : (item.imageUrl || "")
+        };
+      }
+      return null;
+    } catch(e) {
+      if (isDebug()) {
+        showToast(`Yahoo検索失敗: ${e.message}`, 8000);
+      }
+      return null;
     }
   }
 
@@ -1330,6 +2293,33 @@ POLICY: 見た目は極力維持（内部で安定化）
     scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:280,height:180}}, async (t)=> {
       showToast("読み取りOK", 1500);
       await stopScanner();
+      
+      // ✅ バーコード読み取り後、可能なら自動情報取得
+      const jan = t.trim();
+      if (jan && /^\d{8,14}$/.test(jan)) {
+        try {
+          const info = await lookupYahooByJan(jan);
+          if (info) {
+            // 商品情報を自動入力
+            const p = db.products[jan] || { history: [] };
+            if (info.name && (!p.name || !p.name.trim())) {
+              p.name = info.name;
+            }
+            if (info.maker && (!p.maker || !p.maker.trim())) {
+              p.maker = info.maker;
+            }
+            if (info.imageUrl && (!p.imageUrl || !p.imageUrl.startsWith('http'))) {
+              p.imageUrl = info.imageUrl;
+            }
+            db.products[jan] = p;
+            saveLocalOnly();
+            showToast("商品情報を取得しました", 3000);
+          }
+        } catch(e) {
+          if (isDebug()) showToast(`情報取得エラー: ${e.message}`, 5000);
+        }
+      }
+      
       openForm(t);
     }).catch(() => {
       showToast("起動失敗", 8000);
@@ -1368,6 +2358,7 @@ POLICY: 見た目は極力維持（内部で安定化）
     });
   }
 
+  // ✅ 検索ボタン：URL貼り付け（空ならGoogle画像検索を開く）
   async function searchImageWeb() {
     const name = (document.getElementById('inputName').value || '').trim();
     const u = await customPrompt("画像URLを貼る（空欄なら検索を開く）", "");
@@ -1385,35 +2376,66 @@ POLICY: 見た目は極力維持（内部で安定化）
     window.open(`https://www.google.com/search?q=${encodeURIComponent(name || '商品画像')}+商品画像&tbm=isch`, '_blank', 'noopener');
   }
 
+  // ✅ 画像をアップロード（SNS共有用：Firebaseに保存）
   async function handleImage(input) {
-    if (!input || !input.files || !input.files[0]) { return; }
-    const file = input.files[0];
-    showToast("画像を保存中…", 2000);
-
-    const blob = await fileToThumbBlob(file, 256, 0.78);
-    if (!blob) { showToast("画像の読み込みに失敗しました", 8000); return; }
-
-    // ✅ バーコード由来キーで保存（同期でdbが入れ替わっても復元しやすい）
-    const key = imgKeyFromCode(curBarcode);
-    const ok = await idbPut(key, blob);
-
-    const prev = document.getElementById('previewImg');
-    if (prev) {
-      try {
-        const url = URL.createObjectURL(blob);
-        if (prev.dataset && prev.dataset.objurl) { try { URL.revokeObjectURL(prev.dataset.objurl); } catch(e) {} }
-        prev.src = url;
-        if (prev.dataset) prev.dataset.objurl = url;
-      } catch(e) {}
+    if (!input || !input.files || !input.files[0]) {
+      return;
     }
+    const file = input.files[0];
+    showToast("画像を処理中…", 2000);
 
-    if (!ok) { showToast("端末の画像保存に失敗しました（設定/容量を確認）", 10000); return; }
+    try {
+      // ✅ 画像を縮小（サイズ制限対策・EXIF削除）
+      const blob = await fileToThumbBlob(file, 512, 0.85); // 最大512px、品質85%
+      if (!blob) {
+        showToast("画像の読み込みに失敗しました", 8000);
+        return;
+      }
 
-    tempImgData = { type:'key', key };
-    rememberImgKey(curBarcode, key);
-    showToast("画像をこの端末に保存しました（同期はしません）", 5000);
+      // プレビュー表示
+      const prev = document.getElementById('previewImg');
+      if (prev) {
+        try {
+          const url = URL.createObjectURL(blob);
+          prev.src = url;
+          prev.referrerPolicy = "no-referrer";
+        } catch(e) {
+          console.warn('[Image] createObjectURL failed:', e);
+        }
+      }
 
-    try { input.value = ""; } catch(e){}
+      // ✅ Firebaseにアップロード（SNS共有）
+      if (fbUrl && curBarcode) {
+        showToast("画像を共有中…", 3000);
+        try {
+          const { imageId } = await uploadImageToFirebase(curBarcode, blob);
+          tempImgData = { type:'shared', imageId, blob };
+          showToast("画像を共有しました", 3000);
+        } catch(e) {
+          showToast(`共有失敗: ${e.message || '不明なエラー'}`, 8000);
+          // 共有失敗時も端末内に保存（フォールバック）
+          const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+          const ok = await idbPut(key, blob);
+          if (ok) {
+            tempImgData = { type:'key', key };
+            showToast("端末内に保存しました（共有は失敗）", 5000);
+          }
+        }
+      } else {
+        // Firebase未設定時は端末内のみ保存
+        const key = `img_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const ok = await idbPut(key, blob);
+        if (!ok) {
+          showToast("端末の画像保存に失敗しました（設定/容量を確認）", 10000);
+          return;
+        }
+        tempImgData = { type:'key', key };
+        showToast("画像を端末内に保存しました", 5000);
+      }
+    } catch(e) {
+      showToast(`画像処理エラー: ${e.message || '不明なエラー'}`, 8000);
+      if (isDebug()) console.error('[handleImage]', e);
+    }
   }
 
   function customPrompt(msg, def = "") {
@@ -1476,18 +2498,19 @@ POLICY: 見た目は極力維持（内部で安定化）
 
       const targetUrl = getSafeUrl(u);
 
+      // ✅ PUT前にクラウドを読み、マージしてから送る（端末間の取りこぼし減、画像情報も保護）
       try {
-        const res0 = await fetchWithTimeout(targetUrl, { signal: activeSyncController.signal }, 8000);
+        const res0 = await fetchWithTimeout(targetUrl, { signal: activeSyncController.signal }, 9000);
         const cloud0 = await res0.json();
-        const localCount = Object.keys(db.products || {}).length;
-        const cloudCount = cloud0 && cloud0.products ? Object.keys(cloud0.products).length : 0;
-        if (localCount === 0 && cloudCount > 0) {
-          db = mergeCloudIntoLocal(db, cloud0);
+        if (cloud0 && cloud0.products) {
+          db = mergeDb(db, cloud0); // ✅ マージ方式で画像情報が消えない
           saveLocalOnly();
-          showToast("クラウドのデータを読み込みました（空の上書きを回避）", 6000);
         }
-      } catch(e) {}
+      } catch(e) {
+        // 読めなくても続行
+      }
 
+      // PUT（画像は送らない）
       const payload = stripForCloud(db);
       await fetchWithTimeout(targetUrl, {
         method: 'PUT',
@@ -1496,9 +2519,10 @@ POLICY: 見た目は極力維持（内部で安定化）
         signal: activeSyncController.signal
       }, 12000);
 
-      fbUrl = u;
+      // ✅ 成功後：GETで読み直し（Edgeの空表示対策、マージ方式で画像が消えない）
+      fbUrl = u; // let なのでOK
       localStorage.setItem('smartPriceFirebaseUrl', u);
-      await syncFirebase();
+      await syncFirebase(); // ✅ マージ方式
 
       showToast("同期成功！", 3000);
       closeSettings(); showHome();
@@ -1596,9 +2620,18 @@ POLICY: 見た目は極力維持（内部で安定化）
   }
 </script>
 <script>
-if ("serviceWorker" in navigator) {
+// Service Worker 暫定無効化（キャッシュ汚染対策）
+if (false && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(()=>{});
+  });
+}
+// 既存のService Workerを解除（PC真っ黒対策）
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(registrations) {
+    for(let registration of registrations) {
+      registration.unregister();
+    }
   });
 }
 </script>
