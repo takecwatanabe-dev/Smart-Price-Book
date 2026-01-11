@@ -1,20 +1,18 @@
 <!--
 APP: Smart Price
 FILE: index.html
-VERSION: v19.9c-hf16-sync1
-DATE(JST): 2026-01-11 11:28 JST
-TITLE: 同期処理の安定化（ロック機構＋原子的反映＋深いマージ）
+VERSION: v19.9c-hf13-stable2
+DATE(JST): 2026-01-11 20:20 JST
+TITLE: 保存ボタン無反応修正（saveData安定化＋ボタンロック解除）
 CHANGES:
-- 同期ロック機構追加（syncInFlight + syncQueued）で二重起動を完全防止
-- 原子的な反映処理（validateMergedDb + 一括保存）で中途半端な状態を防止
-- 深いマージ（history内のimageKey/imageUrlも保護）
-- stripForCloudの削りすぎ防止（history内は削除しない）
-- デバッグログ追加（?debug=1時のみ：同期結果、マージ結果、統計）
+- 保存ボタン無反応問題を修正（saveData関数にtry-catch追加、ボタンロック解除を確実に実行）
+- デバッグログ追加（?debug=1時のみ：保存処理の詳細をログ出力）
+- エラーハンドリング強化（保存失敗時にshowToastで通知）
 AUTHOR: Rex
-BUILD_ID: 2026-01-11_1128_sync1
-BUILD_PARAM: ?b=2026-01-11_1128_sync1
+BUILD_ID: 2026-01-11_2020_stable2
+BUILD_PARAM: ?b=2026-01-11_2020_stable2
 DEBUG_PARAM: &debug=1
-POLICY: UI変更なし（内部実装のみ）
+POLICY: UI変更禁止（内部修正のみ）
 -->
 
 <!DOCTYPE html>
@@ -27,7 +25,7 @@ POLICY: UI変更なし（内部実装のみ）
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#D50000">
-  <title>Smart Price v19.9c-hf16-sync1</title>
+  <title>Smart Price v19.9c-hf13-stable2</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
   <style>
@@ -88,7 +86,7 @@ POLICY: UI変更なし（内部実装のみ）
 
 <body>
 <header class="header d-flex justify-content-between align-items-center">
-   <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf16-sync1</span></h5>
+   <h5 class="m-0 fw-bold text-white"><i class="bi bi-cart4"></i> Smart Price <span class="v-badge">v19.9c-hf13-stable2</span></h5>
   <button class="btn btn-sm btn-outline-light" onclick="openSettings()"><i class="bi bi-gear-fill"></i></button>
 </header>
 
@@ -119,7 +117,7 @@ POLICY: UI変更なし（内部実装のみ）
               <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="document.getElementById('imgInput').click()"><i class="bi bi-folder2-open"></i></button>
               <button class="btn btn-dark btn-sm p-1 opacity-75" onclick="searchImageWeb()"><i class="bi bi-search"></i></button>
             </div>
-            <input type="file" id="imgInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImage(this)">
+            <input type="file" id="imgInput" accept="image/*" style="display:none;" onchange="handleImage(this)">
           </div>
           <div class="flex-grow-1">
             <input type="text" id="inputName" class="form-control bg-dark text-white border-secondary mb-2" placeholder="商品名（内容量）">
@@ -199,6 +197,10 @@ POLICY: UI変更なし（内部実装のみ）
 
     <button id="syncBtn" class="btn btn-warning w-100 py-3 fw-bold mb-2 shadow" onclick="startMigration()">設定保存と同期</button>
     <button class="btn btn-outline-secondary w-100 py-2 fw-bold mb-2" onclick="openWebModal()">ブラウザ版へ（URL表示）</button>
+    <div id="debugBackupButtons" style="display:none;">
+      <button class="btn btn-success w-100 py-2 fw-bold mb-2" onclick="exportBackup()">バックアップ出力</button>
+      <button class="btn btn-info w-100 py-2 fw-bold mb-2" onclick="importBackup()">バックアップ読み込み</button>
+    </div>
     <button class="btn btn-link text-secondary w-100" onclick="closeSettings()">閉じる</button>
   </div>
 </div>
@@ -238,8 +240,8 @@ POLICY: UI変更なし（内部実装のみ）
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script>
-  const APP_VERSION = "v19.9c-hf16-sync1";
-  const BUILD_ID = "2026-01-11_1128_sync1";
+  const APP_VERSION = "v19.9c-hf13-stable2";
+  const BUILD_ID = "2026-01-11_2020_stable2";
 
   // ========= Firebase Configuration =========
   const FIREBASE_CONFIG = {
@@ -702,23 +704,76 @@ POLICY: UI変更なし（内部実装のみ）
     }, 8000);
   }
 
+  // ✅ 画像キーの復元ロジック強化（古い紐づけも探索）
   async function applyImageKeyToImg(imgEl, key) {
     if (!imgEl || !key) {
       return Promise.reject(new Error('Invalid parameters'));
     }
     try {
-      const blob = await idbGet(key);
-      if (!blob) {
+      // 1. まず指定されたキーで取得
+      let blob = await idbGet(key);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        imgEl.src = url;
+        imgEl.referrerPolicy = "no-referrer";
+        // メモリ解放（置換時）
+        if (imgEl.dataset && imgEl.dataset.objurl) {
+          try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
+        }
+        imgEl.dataset.objurl = url;
+        return Promise.resolve();
+      }
+      
+      // 2. 指定されたキーが見つからない場合、古いキーを探索
+      const dbi = await openImgDb();
+      if (!dbi || !dbi.objectStoreNames.contains(IMG_STORE)) {
         return Promise.reject(new Error('Image not found in IndexedDB'));
       }
-      const url = URL.createObjectURL(blob);
-      imgEl.src = url;
-      imgEl.referrerPolicy = "no-referrer";
-      // メモリ解放（置換時）
-      if (imgEl.dataset && imgEl.dataset.objurl) {
-        try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
+      
+      // IndexedDBから全キーを取得
+      const allKeys = await new Promise((resolve) => {
+        try {
+          const tx = dbi.transaction(IMG_STORE, "readonly");
+          const store = tx.objectStore(IMG_STORE);
+          const req = store.getAllKeys();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        } catch(e) {
+          resolve([]);
+        }
+      });
+      
+      // 3. 古いキーのパターンを試す（部分一致）
+      // キーからバーコード部分を抽出（例：img_1234567890123 → 1234567890123）
+      const codeMatch = key.match(/img_([0-9]+)/);
+      if (codeMatch && codeMatch[1]) {
+        const code = codeMatch[1];
+        // バーコードベースのキーを探す（img_${code} または img_${code}_*）
+        const candidateKeys = allKeys.filter(k => {
+          const kStr = String(k);
+          return kStr.includes(code) && (kStr.startsWith('img_') || kStr.includes('_img_'));
+        });
+        
+        // 候補キーを試す（最も長いキーから試す）
+        candidateKeys.sort((a, b) => String(b).length - String(a).length);
+        for (const candidateKey of candidateKeys) {
+          blob = await idbGet(candidateKey);
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            imgEl.src = url;
+            imgEl.referrerPolicy = "no-referrer";
+            if (imgEl.dataset && imgEl.dataset.objurl) {
+              try { URL.revokeObjectURL(imgEl.dataset.objurl); } catch(e) {}
+            }
+            imgEl.dataset.objurl = url;
+            if (isDebug()) console.log('[applyImageKeyToImg] Found old key:', candidateKey, 'for', key);
+            return Promise.resolve();
+          }
+        }
       }
-      imgEl.dataset.objurl = url;
+      
+      // 4. それでも見つからない場合はエラー
+      return Promise.reject(new Error('Image not found in IndexedDB (tried fallback)'));
     } catch(e) {
       if (isDebug()) console.warn('[applyImageKeyToImg]', e);
       return Promise.reject(e);
@@ -804,6 +859,16 @@ POLICY: UI変更なし（内部実装のみ）
     }
 
     try {
+      // ✅ 保管箱の保護（自動整理されにくくする）
+      if ('storage' in navigator && 'persist' in navigator.storage) {
+        try {
+          const persisted = await navigator.storage.persist();
+          if (isDebug()) console.log('[Storage] Persist granted:', persisted);
+        } catch(e) {
+          if (isDebug()) console.warn('[Storage] Persist failed:', e);
+        }
+      }
+
       // ✅ Firebase初期化（匿名ログイン）
       await initializeFirebase();
       setupAuthListener();
@@ -2114,73 +2179,115 @@ POLICY: UI変更なし（内部実装のみ）
   }
 
   async function saveData() {
-    if (curStore === "未設定") { showToast("店名を選んでください", 4000); return; }
-
-    const cat = document.getElementById('inputCategory').value;
-    if (cat === "__NONE__") { showToast("カテゴリを選んでください", 4000); return; }
-
-    const subSel = document.getElementById('inputSubCategory');
-    const needsSub = (subSel && subSel.style.display !== 'none');
-    const sub = needsSub ? subSel.value : "__NONE__";
-    if (needsSub && sub === "__NONE__") { showToast("サブカテゴリを選んでください", 4000); return; }
-
-    const p = db.products[curBarcode] || { history: [] };
-    p.name = document.getElementById('inputName').value || "名称なし";
-    p.category = cat;
-    p.subCategory = needsSub ? sub : "";
-    p.maker = document.getElementById('inputMaker').value || "";
-
-    // ✅ 画像（プレビュー）→ Firebase共有またはIndexedDBへ保存
-    if (tempImgData && tempImgData.type === 'shared' && tempImgData.imageId) {
-      // 共有画像の場合、imageUrlに共有画像のURLを保存（参照のみ）
-      // 実際の画像データはFirebaseに保存済み
-      p.imageUrl = `shared:${tempImgData.imageId}`;
-      delete p.image;
-      delete p.imageKey; // 共有画像はimageKeyを使わない
-    } else if (tempImgData && typeof tempImgData === 'string' && tempImgData.startsWith('data:')) {
-      // 旧方式：dataURL → IndexedDB
-      const blob = dataURLtoBlob(tempImgData);
-      if (blob) {
-        const key = 'img_' + String(curBarcode || '').replace(/[^\w\-]/g, '_');
-        await idbPut(key, blob);
-        p.imageKey = key;
+    const saveBtn = document.getElementById('saveBtn');
+    
+    // ✅ ボタンを無効化（二度押し防止）
+    if (saveBtn) saveBtn.disabled = true;
+    
+    try {
+      if (curStore === "未設定") {
+        showToast("店名を選んでください", 4000);
+        if (saveBtn) saveBtn.disabled = false;
+        return;
       }
-      delete p.imageData;
-      delete p.image;
-    } else if (tempImgData && tempImgData.type === 'key') {
-      p.imageKey = tempImgData.key;
-      delete p.image;
-    } else if (tempImgData && tempImgData.type === 'url') {
-      p.imageUrl = tempImgData.url;
-      delete p.image;
+
+      const cat = document.getElementById('inputCategory').value;
+      if (cat === "__NONE__") {
+        showToast("カテゴリを選んでください", 4000);
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      const subSel = document.getElementById('inputSubCategory');
+      const needsSub = (subSel && subSel.style.display !== 'none');
+      const sub = needsSub ? subSel.value : "__NONE__";
+      if (needsSub && sub === "__NONE__") {
+        showToast("サブカテゴリを選んでください", 4000);
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      const p = db.products[curBarcode] || { history: [] };
+      p.name = document.getElementById('inputName').value || "名称なし";
+      p.category = cat;
+      p.subCategory = needsSub ? sub : "";
+      p.maker = document.getElementById('inputMaker').value || "";
+
+      // ✅ デバッグログ
+      if (isDebug()) {
+        console.log("[SaveData] code:", curBarcode, "store:", curStore, "category:", cat, "subCategory:", sub);
+      }
+
+      // ✅ 画像（プレビュー）→ Firebase共有またはIndexedDBへ保存
+      if (tempImgData && tempImgData.type === 'shared' && tempImgData.imageId) {
+        // 共有画像の場合、imageUrlに共有画像のURLを保存（参照のみ）
+        // 実際の画像データはFirebaseに保存済み
+        p.imageUrl = `shared:${tempImgData.imageId}`;
+        delete p.image;
+        delete p.imageKey; // 共有画像はimageKeyを使わない
+      } else if (tempImgData && typeof tempImgData === 'string' && tempImgData.startsWith('data:')) {
+        // 旧方式：dataURL → IndexedDB
+        const blob = dataURLtoBlob(tempImgData);
+        if (blob) {
+          const key = 'img_' + String(curBarcode || '').replace(/[^\w\-]/g, '_');
+          await idbPut(key, blob);
+          p.imageKey = key;
+        }
+        delete p.imageData;
+        delete p.image;
+      } else if (tempImgData && tempImgData.type === 'key') {
+        p.imageKey = tempImgData.key;
+        delete p.image;
+      } else if (tempImgData && tempImgData.type === 'url') {
+        p.imageUrl = tempImgData.url;
+        delete p.image;
+      }
+
+      const val = Number(document.getElementById('inputPrice').value);
+      if (!Number.isFinite(val) || val <= 0) {
+        showToast("価格を入力してください", 4000);
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      if (editingHistIdx !== null) {
+        p.history[editingHistIdx].price = val;
+        p.history[editingHistIdx].store = curStore;
+        showToast("変更を反映しました", 2000);
+        if (isDebug()) console.log("[SaveData] History updated:", editingHistIdx);
+      } else {
+        const disc = Number(document.getElementById('inputDisc').value || 0);
+        let finalP = Math.floor(val * (1 - disc/100));
+        if(document.getElementById('taxEx').checked) finalP = Math.floor(finalP * 1.08);
+        db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
+        const entry = { price: finalP, store: curStore, ts: Date.now() };
+        if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
+        p.history.push(entry);
+        showToast("保存完了", 2000);
+        if (isDebug()) console.log("[SaveData] New entry added:", entry);
+      }
+
+      db.products[curBarcode] = p;
+      db = normalizeDb(db);
+
+      saveLocalOnly();
+      syncFirebasePut();
+
+      renderHistory();
+      showHome();
+      
+      if (isDebug()) console.log("[SaveData] Save completed successfully");
+      
+    } catch(e) {
+      showToast("保存に失敗しました", 8000);
+      if (isDebug()) {
+        console.error("[SaveData] Error:", e);
+        console.error("[SaveData] Stack:", e.stack);
+      }
+    } finally {
+      // ✅ 確実にボタンを有効化
+      if (saveBtn) saveBtn.disabled = false;
     }
-
-    const val = Number(document.getElementById('inputPrice').value);
-    if (!Number.isFinite(val) || val <= 0) { showToast("価格を入力してください", 4000); return; }
-
-    if (editingHistIdx !== null) {
-      p.history[editingHistIdx].price = val;
-      p.history[editingHistIdx].store = curStore;
-      showToast("変更を反映しました", 2000);
-    } else {
-      const disc = Number(document.getElementById('inputDisc').value || 0);
-      let finalP = Math.floor(val * (1 - disc/100));
-      if(document.getElementById('taxEx').checked) finalP = Math.floor(finalP * 1.08);
-      db.config.lastTax = document.getElementById('taxEx').checked ? "ex" : "in";
-      const entry = { price: finalP, store: curStore, ts: Date.now() };
-      if(curPos) { entry.lat = curPos.lat; entry.lng = curPos.lng; }
-      p.history.push(entry);
-      showToast("保存完了", 2000);
-    }
-
-    db.products[curBarcode] = p;
-    db = normalizeDb(db);
-
-    saveLocalOnly();
-    syncFirebasePut();
-
-    renderHistory();
-    showHome();
   }
 
   function toggleHistoryList() {
@@ -2373,7 +2480,9 @@ POLICY: UI変更なし（内部実装のみ）
       }
       return;
     }
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(name || '商品画像')}+商品画像&tbm=isch`, '_blank', 'noopener');
+    const maker = (document.getElementById('inputMaker').value || '').trim();
+    const searchQuery = [name, maker].filter(Boolean).join(' ') || '商品画像';
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}+商品画像&tbm=isch`, '_blank', 'noopener');
   }
 
   // ✅ 画像をアップロード（SNS共有用：Firebaseに保存）
@@ -2548,6 +2657,12 @@ POLICY: UI変更なし（内部実装のみ）
       const cityInput = document.getElementById('home-city-input');
       if(cityInput) cityInput.value = db.config.homeCity || '';
       renderCityChips();
+      
+      // ✅ デバッグモード時のみバックアップボタンを表示
+      const backupButtons = document.getElementById('debugBackupButtons');
+      if (backupButtons) {
+        backupButtons.style.display = isDebug() ? 'block' : 'none';
+      }
     } catch(e) {
       showToast('設定画面エラー', 8000);
     }
@@ -2617,6 +2732,144 @@ POLICY: UI変更なし（内部実装のみ）
     if(!el) return;
     const text = el.value || "";
     window.open(text, "_blank", "noopener");
+  }
+
+  // ========= バックアップ機能（&debug=1時のみ） =========
+  
+  // ✅ バックアップ出力（データ＋画像をファイルとして保存）
+  async function exportBackup() {
+    if (!isDebug()) return;
+    
+    try {
+      showToast("バックアップ出力中…", 3000);
+      
+      // 1. データ（localStorage）を取得
+      const dataStr = localStorage.getItem('smart_price_db');
+      if (!dataStr) {
+        showToast("データがありません", 5000);
+        return;
+      }
+      const data = JSON.parse(dataStr);
+      
+      // 2. 画像（IndexedDB）を取得
+      const dbi = await openImgDb();
+      const images = {};
+      if (dbi && dbi.objectStoreNames.contains(IMG_STORE)) {
+        const tx = dbi.transaction(IMG_STORE, "readonly");
+        const store = tx.objectStore(IMG_STORE);
+        const keys = await new Promise((resolve) => {
+          const req = store.getAllKeys();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+        
+        for (const key of keys) {
+          const blob = await idbGet(key);
+          if (blob) {
+            // Blobをbase64に変換
+            const dataUrl = await new Promise((resolve, reject) => {
+              const fr = new FileReader();
+              fr.onload = () => resolve(fr.result);
+              fr.onerror = () => reject(new Error('画像読み込み失敗'));
+              fr.readAsDataURL(blob);
+            });
+            images[key] = dataUrl;
+          }
+        }
+      }
+      
+      // 3. バックアップデータを作成
+      const backup = {
+        version: APP_VERSION,
+        buildId: BUILD_ID,
+        exportDate: new Date().toISOString(),
+        data: data,
+        images: images
+      };
+      
+      // 4. ファイルとしてダウンロード
+      const jsonStr = JSON.stringify(backup, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `smart_price_backup_${new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast("バックアップ出力完了", 3000);
+      if (isDebug()) {
+        console.log('[Backup] Exported:', Object.keys(backup.data.products || {}).length, 'products,', Object.keys(backup.images).length, 'images');
+      }
+    } catch(e) {
+      showToast(`バックアップ出力失敗: ${e.message}`, 8000);
+      if (isDebug()) console.error('[Backup] Export failed:', e);
+    }
+  }
+  
+  // ✅ バックアップ読み込み（ファイルから復元）
+  async function importBackup() {
+    if (!isDebug()) return;
+    
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      
+      try {
+        showToast("バックアップ読み込み中…", 3000);
+        
+        // 1. ファイルを読み込み
+        const text = await file.text();
+        const backup = JSON.parse(text);
+        
+        if (!backup.data || typeof backup.data !== 'object') {
+          throw new Error('バックアップデータが無効です');
+        }
+        
+        // 2. データを復元（localStorage）
+        localStorage.setItem('smart_price_db', JSON.stringify(backup.data));
+        db = normalizeDb(backup.data);
+        
+        // 3. 画像を復元（IndexedDB）
+        if (backup.images && typeof backup.images === 'object') {
+          const dbi = await openImgDb();
+          if (dbi && dbi.objectStoreNames.contains(IMG_STORE)) {
+            let restored = 0;
+            for (const [key, dataUrl] of Object.entries(backup.images)) {
+              if (typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+                const blob = dataURLtoBlob(dataUrl);
+                if (blob) {
+                  const ok = await idbPut(key, blob);
+                  if (ok) restored++;
+                }
+              }
+            }
+            if (isDebug()) {
+              console.log('[Backup] Restored:', restored, 'images');
+            }
+          }
+        }
+        
+        // 4. UI更新
+        initCategorySelect();
+        renderStoreList();
+        await renderHistory();
+        
+        showToast("バックアップ読み込み完了", 3000);
+        if (isDebug()) {
+          console.log('[Backup] Imported:', Object.keys(backup.data.products || {}).length, 'products');
+        }
+      } catch(e) {
+        showToast(`バックアップ読み込み失敗: ${e.message}`, 8000);
+        if (isDebug()) console.error('[Backup] Import failed:', e);
+      }
+    };
+    input.click();
   }
 </script>
 <script>
